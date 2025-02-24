@@ -72,13 +72,9 @@ class CharacteristicRepository {
       final primaryCycles = primaryCyclesCharacteristic!.lastValue;
       final secondaryCycles = secondaryCyclesCharacteristic!.lastValue;
 
-      if (primary != null && secondary != null && cbb != null && 
-          cbbCharging != null && aux != null && primaryCycles != null && 
-          secondaryCycles != null) {
-        // Format: primarySOC,secondarySOC,cbbSOC,cbbCharging,auxSOC,primaryCycles,secondaryCycles
-        final combinedValue = '${ascii.decode(primary)},${ascii.decode(secondary)},${ascii.decode(cbb)},${ascii.decode(cbbCharging)},${ascii.decode(aux)},${ascii.decode(primaryCycles)},${ascii.decode(secondaryCycles)}';
-        controller.add(ascii.encode(combinedValue));
-      }
+      // Format: primarySOC,secondarySOC,cbbSOC,cbbCharging,auxSOC,primaryCycles,secondaryCycles
+      final combinedValue = '${ascii.decode(primary)},${ascii.decode(secondary)},${ascii.decode(cbb)},${ascii.decode(cbbCharging)},${ascii.decode(aux)},${ascii.decode(primaryCycles)},${ascii.decode(secondaryCycles)}';
+      controller.add(ascii.encode(combinedValue));
     } catch (e, stack) {
       log.warning("Failed to update battery values", e, stack);
     }

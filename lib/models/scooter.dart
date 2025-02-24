@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:math' as Math;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
@@ -304,6 +304,16 @@ class Scooter with ChangeNotifier {
     }
   }
 
+  // Update last connection timestamp
+  void updateLastConnection(DateTime timestamp) {
+    if (_lastBleConnect == null || timestamp.isAfter(_lastBleConnect!)) {
+      _lastBleConnect = timestamp;
+      _lastPing = timestamp;
+      notifyListeners();
+      saveToPrefs();
+    }
+  }
+
   // Reset to disconnected state
   void resetConnection() {
     _bleConnected = false;
@@ -378,8 +388,8 @@ class Scooter with ChangeNotifier {
   }
 
   int calculateNonThrottledRange() {
-    int primaryRange = _primarySOC != null ? (Math.max(0, (_primarySOC! - 20) / 100 * 45)).round() : 0;
-    int secondaryRange = _secondarySOC != null ? (Math.max(0, (_secondarySOC! - 20) / 100 * 45)).round() : 0;
+    int primaryRange = _primarySOC != null ? (math.max(0, (_primarySOC! - 20) / 100 * 45)).round() : 0;
+    int secondaryRange = _secondarySOC != null ? (math.max(0, (_secondarySOC! - 20) / 100 * 45)).round() : 0;
     return primaryRange + secondaryRange;
   }
 }

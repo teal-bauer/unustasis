@@ -1,14 +1,15 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'dart:async';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:unustasis/domain/scooter_state.dart';
+import 'package:unustasis/models/scooter_manager.dart';
 
 import '../background/widget_handler.dart';
 import '../flutter/blue_plus_mockable.dart';
-import '../scooter_service.dart';
 
 // Notification identifiers
 const notificationChannelId = 'unu_foreground';
@@ -16,8 +17,8 @@ const notificationChannelName = 'Unu Background Connection';
 const notificationId = 1612;
 
 FlutterBluePlusMockable fbp = FlutterBluePlusMockable();
-ScooterService scooterService =
-    ScooterService(fbp, isInBackgroundService: true);
+ScooterManager scooterService =
+    ScooterManager(fbp, isInBackgroundService: true);
 
 startBackgroundService() {
   final service = FlutterBackgroundService();
@@ -45,7 +46,7 @@ Future<void> setupBackgroundService() async {
           description:
               'This channel is used for periodically checking your scooter.', // description
           importance: Importance
-              .low, // importance must be at low or higher levelongoing: true,
+              .low, // importance must be at low or higher level ongoing: true,
         ),
       );
 
@@ -73,10 +74,51 @@ Future<void> setupBackgroundService() async {
 }
 
 void updateNotification({String? debugText}) async {
+  String stateName = "Disconnected";
+  if (scooterService.state != null) {
+    // Simple mapping of state names for notification
+    switch (scooterService.state) {
+      case ScooterState.standby:
+        stateName = "Standby";
+        break;
+      case ScooterState.off:
+        stateName = "Off";
+        break;
+      case ScooterState.parked:
+        stateName = "Parked";
+        break;
+      case ScooterState.ready:
+        stateName = "Ready";
+        break;
+      case ScooterState.hibernating:
+        stateName = "Hibernating";
+        break;
+      case ScooterState.hibernatingImminent:
+        stateName = "Hibernating soon...";
+        break;
+      case ScooterState.booting:
+        stateName = "Booting...";
+        break;
+      case ScooterState.linking:
+        stateName = "Searching...";
+        break;
+      case ScooterState.disconnected:
+        stateName = "Disconnected";
+        break;
+      case ScooterState.shuttingDown:
+        stateName = "Shutting down...";
+        break;
+      case ScooterState.unknown:
+      default:
+        stateName = "Unknown";
+        break;
+    }
+  }
+  
   FlutterLocalNotificationsPlugin().show(
     notificationId,
     "Unu Scooter",
-    scooterService.state?.getNameStatic(),
+    stateName,
     const NotificationDetails(
       android: AndroidNotificationDetails(
           notificationChannelId, notificationChannelName,
@@ -127,15 +169,17 @@ void onStart(ServiceInstance service) async {
       if (data?["hazardLocking"] != null) {
         scooterService.setHazardLocking(data!["hazardLocking"]);
       }
-      if (data?["scooterName"] != null) {
-        scooterService.scooterName = data!["scooterName"];
-      }
-      if (data?["mostRecent"] != null) {
+      if (data?["scooterName"] != null && data?["mostRecent"] != null) {
+        // Update the scooter name by finding the scooter and renaming it
+        String scooterId = data!["mostRecent"];
+        String scooterName = data["scooterName"];
+        if (scooterService.scooters.containsKey(scooterId)) {
+          scooterService.renameSavedScooter(id: scooterId, name: scooterName);
+        }
+      } else if (data?["mostRecent"] != null) {
         scooterService.setMostRecentScooter(data!["mostRecent"]);
       }
-      if (data?["lastPing"] != null) {
-        scooterService.lastPing = data!["lastPing"];
-      }
+      // lastPing is now handled automatically by the ScooterManager when updating connections
     } catch (e) {
       print("Somethin happen");
     }
@@ -158,7 +202,7 @@ void onStart(ServiceInstance service) async {
 
   // listen to changes
   scooterService.addListener(() {
-    print("ScooterService updated");
+    print("ScooterManager updated");
     passToWidget(
       connected: scooterService.connected,
       lastPing: scooterService.lastPing,

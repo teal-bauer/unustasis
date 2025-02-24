@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -11,7 +10,7 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/platform_tags.dart';
 import 'package:provider/provider.dart';
 
-import '../scooter_service.dart';
+import '../models/scooter_manager.dart';
 
 class BatterySection extends StatefulWidget {
   const BatterySection({required this.dataIsOld, super.key});
@@ -31,125 +30,115 @@ class _BatterySectionState extends State<BatterySection> {
 
   @override
   Widget build(BuildContext context) {
+    final manager = Provider.of<ScooterManager>(context);
+    final activeScooter = manager.activeScooter;
+    
+    if (activeScooter == null) {
+      return Center(
+        child: Text(FlutterI18n.translate(context, "stats_no_scooter")),
+      );
+    }
+    
     return ListView(
       padding: const EdgeInsets.all(16),
       shrinkWrap: true,
       children: [
-        Selector<ScooterService, ({int? primarySOC, int? secondarySOC})>(
-            selector: (context, service) => (
-                  primarySOC: service.primarySOC,
-                  secondarySOC: service.secondarySOC
-                ),
-            builder: (context, data, _) {
-              int primaryRange = data.primarySOC != null
-                  ? (45 * (data.primarySOC! / 100)).round()
-                  : 0;
-              int secondaryRange = data.secondarySOC != null
-                  ? (45 * (data.secondarySOC! / 100)).round()
-                  : 0;
-              return Column(children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32.0),
-                  child: Column(
-                    children: [
-                      Text(
-                        "${primaryRange + secondaryRange} km ${FlutterI18n.translate(context, "stats_total_range")}",
-                        style: Theme.of(context).textTheme.headlineLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        (primaryRange == 0 && secondaryRange == 0)
-                            ? FlutterI18n.translate(
-                                context, "stats_no_batteries")
-                            : FlutterI18n.translate(
-                                context, "stats_range_until_throttled",
-                                translationParams: {
-                                    "range":
-                                        "${math.max(0, primaryRange - 9) + math.max(0, secondaryRange - 9)}"
-                                  }),
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ],
+        // Range information
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32.0),
+              child: Column(
+                children: [
+                  Text(
+                    "${activeScooter.calculateRange()} km ${FlutterI18n.translate(context, "stats_total_range")}",
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    (activeScooter.primarySOC == null && activeScooter.secondarySOC == null)
+                        ? FlutterI18n.translate(context, "stats_no_batteries")
+                        : FlutterI18n.translate(
+                            context, "stats_range_until_throttled",
+                            translationParams: {
+                                "range": "${activeScooter.calculateNonThrottledRange()}"
+                              }),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                if (activeScooter.secondarySOC != null && activeScooter.secondarySOC! > 0)
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: activeScooter.secondarySOC! / 100,
+                      borderRadius: BorderRadius.circular(16.0),
+                      minHeight: 24,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surface,
+                      color: widget.dataIsOld
+                          ? Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.4)
+                          : activeScooter.secondarySOC! <= 15
+                              ? Colors.red
+                              : Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                if (activeScooter.secondarySOC != null && activeScooter.secondarySOC! > 0)
+                  const SizedBox(width: 8),
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: (activeScooter.primarySOC ?? 0) / 100,
+                    borderRadius: BorderRadius.circular(16.0),
+                    minHeight: 24,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    color: widget.dataIsOld
+                        ? Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.4)
+                        : (activeScooter.primarySOC ?? 0) <= 15
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                Row(
-                  children: [
-                    if (data.secondarySOC != null && data.secondarySOC! > 0)
-                      Expanded(
-                        child: LinearProgressIndicator(
-                          value: data.secondarySOC! / 100,
-                          borderRadius: BorderRadius.circular(16.0),
-                          minHeight: 24,
-                          backgroundColor:
-                              Theme.of(context).colorScheme.surface,
-                          color: widget.dataIsOld
-                              ? Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.4)
-                              : data.secondarySOC! <= 15
-                                  ? Colors.red
-                                  : Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    if (data.secondarySOC != null && data.secondarySOC! > 0)
-                      const SizedBox(width: 8),
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: (data.primarySOC ?? 0) / 100,
-                        borderRadius: BorderRadius.circular(16.0),
-                        minHeight: 24,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        color: widget.dataIsOld
-                            ? Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.4)
-                            : (data.primarySOC ?? 0) <= 15
-                                ? Colors.red
-                                : Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ]);
-            }),
+              ],
+            ),
+          ],
+        ),
+        
         const SizedBox(height: 32),
-        if ((context.select<ScooterService, int?>(
-                    (service) => service.primarySOC) ??
-                0) >
-            0)
+        
+        // Primary battery
+        if ((activeScooter.primarySOC ?? 0) > 0)
           _batteryCard(
             type: BatteryType.primary,
-            soc: context
-                .select<ScooterService, int?>((service) => service.primarySOC)!,
-            cycles: context.select<ScooterService, int?>(
-                (service) => service.primaryCycles),
+            soc: activeScooter.primarySOC!,
+            cycles: activeScooter.primaryCycles,
             old: widget.dataIsOld,
           ),
 
-        if ((context.select<ScooterService, int?>(
-                    (service) => service.secondarySOC) ??
-                0) >
-            0)
+        // Secondary battery
+        if ((activeScooter.secondarySOC ?? 0) > 0)
           _batteryCard(
             type: BatteryType.secondary,
-            soc: context.select<ScooterService, int?>(
-                (service) => service.secondarySOC)!,
-            cycles: context.select<ScooterService, int?>(
-                (service) => service.secondaryCycles),
+            soc: activeScooter.secondarySOC!,
+            cycles: activeScooter.secondaryCycles,
             old: widget.dataIsOld,
           ),
+          
+        // Internal batteries
         Row(
           children: [
             Expanded(
               child: _internalBatteryCard(
                 type: BatteryType.cbb,
-                soc: context.select<ScooterService, int?>(
-                        (service) => service.cbbSOC) ??
-                    100,
-                charging: context.select<ScooterService, bool?>(
-                    (service) => service.cbbCharging),
+                soc: activeScooter.cbbSOC ?? 100,
+                charging: activeScooter.cbbCharging,
                 old: widget.dataIsOld,
               ),
             ),
@@ -157,16 +146,14 @@ class _BatterySectionState extends State<BatterySection> {
             Expanded(
               child: _internalBatteryCard(
                 type: BatteryType.aux,
-                soc: context.select<ScooterService, int?>(
-                        (service) => service.auxSOC) ??
-                    100,
+                soc: activeScooter.auxSOC ?? 100,
                 old: widget.dataIsOld,
               ),
             ),
           ],
         ),
 
-        // only available on Android, hidden right now though
+        // NFC scanning (only available on Android, hidden right now though)
         if (Platform.isWindows)
           Divider(
             height: 40,

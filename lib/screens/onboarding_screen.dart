@@ -13,7 +13,7 @@ import 'package:provider/provider.dart';
 
 import '../domain/scooter_state.dart';
 import '../domain/theme_helper.dart';
-import '../scooter_service.dart';
+import '../models/scooter_manager.dart';
 import '../widgets/scooter_visual.dart';
 import 'home_screen.dart';
 import 'support_screen.dart';
@@ -67,18 +67,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
     _pairingController.repeat();
 
-    context.read<ScooterService>().addListener(() {
+    context.read<ScooterManager>().addListener(() {
       if (mounted) {
-        ScooterService service = context.read<ScooterService>();
+        final manager = context.read<ScooterManager>();
         setState(() {
-          _scanning = service.scanning;
+          _scanning = manager.scanning;
         });
-        if (service.scanning) {
+        if (manager.scanning) {
           _scanningController.repeat();
-        } else if (!service.scanning) {
+        } else if (!manager.scanning) {
           _scanningController.stop();
         }
-        if (service.connected) {
+        if (manager.connected) {
           setState(() {
             _step = 5;
           });
@@ -185,9 +185,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             btnText: FlutterI18n.translate(context, "onboarding_step3_button"),
             onPressed: () {
               try {
-                context.read<ScooterService>().connectToScooterId(
+                context.read<ScooterManager>().connectToScooterId(
                       _foundScooter!.remoteId.toString(),
-                      initialConnect: true,
                     );
               } catch (e, stack) {
                 log.severe("Error connecting to scooter!", e, stack);
@@ -287,10 +286,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _startSearch() async {
     try {
-      _foundScooter = await context.read<ScooterService>().findEligibleScooter(
-          excludedScooterIds: widget.excludedScooterIds ?? [],
-          // exclude system scooters if we're adding an additional scooter
-          includeSystemScooters: !widget.skipWelcome);
+      _foundScooter = await context.read<ScooterManager>().scanForNewScooters(
+          excludeIds: widget.excludedScooterIds ?? [],
+          timeout: const Duration(seconds: 30),
+      ).then((devices) => devices.isNotEmpty ? devices.first : null);
       if (_foundScooter != null) {
         setState(() {
           _step = 3;

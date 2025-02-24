@@ -3,8 +3,8 @@ import 'package:flutter_i18n/flutter_i18n.dart';
 import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 
-import '../domain/format_utils.dart';
-import 'scooter_service.dart';
+import 'domain/format_utils.dart';
+import 'models/scooter_manager.dart';
 
 class ScooterSelectionDialog extends StatelessWidget {
   final List<Map<String, dynamic>> scooters;
@@ -29,8 +29,8 @@ class ScooterSelectionDialog extends StatelessWidget {
     }
     
     // Find any local scooter that matches the device IDs
-    final scooterService = context.read<ScooterService>();
-    final matchingScooters = scooterService.savedScooters.values.where((saved) {
+    final manager = context.read<ScooterManager>();
+    final matchingScooters = manager.scooters.values.where((saved) {
       return deviceIds.containsValue(saved.id.toLowerCase());
     }).toList();
 

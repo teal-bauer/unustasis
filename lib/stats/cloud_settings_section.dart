@@ -6,7 +6,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:logging/logging.dart';
 
 import '../cloud_service.dart';
-import '../scooter_service.dart';
+import '../models/scooter_manager.dart';
 import '../cloud_scooter_selection_dialog.dart';
 import '../components/cloud_scooter_card.dart';
 
@@ -27,7 +27,7 @@ class _CloudSettingsSectionState extends State<CloudSettingsSection> {
   @override
   void initState() {
     super.initState();
-    _cloudService = CloudService(context.read<ScooterService>());
+    _cloudService = CloudService(context.read<ScooterManager>());
     _checkAuthStatus();
   }
 
@@ -56,9 +56,12 @@ class _CloudSettingsSectionState extends State<CloudSettingsSection> {
   }
 
   Future<void> _saveAssignment(int? scooterId) async {
-    final service = context.read<ScooterService>();
-    if (scooterId != null) {
-      service.setCloudScooterId(scooterId);
+    final manager = context.read<ScooterManager>();
+    if (scooterId != null && manager.activeScooterId != null) {
+      manager.linkScooterToCloud(
+        scooterId: manager.activeScooterId!,
+        cloudScooterId: scooterId,
+      );
     }
   }
 
@@ -116,13 +119,15 @@ class _CloudSettingsSectionState extends State<CloudSettingsSection> {
   }
 
   Widget _buildLinkedScooterTile() {
-    final service = context.read<ScooterService>();
-    final currentCloudScooterId = service.getCurrentCloudScooterId();
+    final manager = context.read<ScooterManager>();
+    final activeScooter = manager.activeScooter;
+    final currentCloudScooterId = activeScooter?.cloudScooterId;
 
     if (currentCloudScooterId == null) return Container();
 
     final scooter = _cloudScooters.firstWhere(
       (s) => s['id'] == currentCloudScooterId,
+      orElse: () => {'name': 'Unknown', 'last_seen_at': DateTime.now().toIso8601String(), 'color_id': 1},
     );
 
     return CloudScooterCard(
@@ -132,8 +137,8 @@ class _CloudSettingsSectionState extends State<CloudSettingsSection> {
   }
 
   Future<void> _handleScooterSelection() async {
-    final scooterService = context.read<ScooterService>();
-    final currentScooterId = scooterService.currentScooterId;
+    final manager = context.read<ScooterManager>();
+    final currentScooterId = manager.activeScooterId;
 
     if (currentScooterId == null) {
       ScaffoldMessenger.of(context)
@@ -228,10 +233,10 @@ class _CloudSettingsSectionState extends State<CloudSettingsSection> {
         ListTile(
           leading: const Icon(Icons.link),
           title: Text(FlutterI18n.translate(context, "cloud_select_scooter")),
-          subtitle: Text(context.read<ScooterService>().getCurrentCloudScooterId() != null
+          subtitle: Text(context.read<ScooterManager>().activeScooter?.cloudScooterId != null
               ? FlutterI18n.translate(context, "cloud_scooter_linked_to", translationParams: {
                   "name": _cloudScooters.firstWhere(
-                      (s) => s['id'] == context.read<ScooterService>().getCurrentCloudScooterId(),
+                      (s) => s['id'] == context.read<ScooterManager>().activeScooter?.cloudScooterId,
                       orElse: () => {'name': 'Unknown'})['name']
                 })
               : FlutterI18n.translate(context, "cloud_no_scooter_linked")),

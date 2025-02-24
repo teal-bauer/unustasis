@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
-import '../scooter_service.dart';
+import '../models/scooter_manager.dart';
 
 class DrivingScreen extends StatefulWidget {
   const DrivingScreen({super.key});
@@ -122,8 +122,8 @@ class _DrivingScreenState extends State<DrivingScreen> {
               ],
             ),
             const SizedBox(height: 32),
-            Selector<ScooterService, int?>(
-              selector: (context, service) => service.primarySOC,
+            Selector<ScooterManager, int?>(
+              selector: (context, manager) => manager.primarySOC,
               builder: (context, primarySOC, _) {
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -146,8 +146,8 @@ class _DrivingScreenState extends State<DrivingScreen> {
               },
             ),
             const SizedBox(height: 8),
-            Selector<ScooterService, int?>(
-              selector: (context, service) => service.secondarySOC,
+            Selector<ScooterManager, int?>(
+              selector: (context, manager) => manager.secondarySOC,
               builder: (context, secondarySOC, _) {
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.center,

@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:logging/logging.dart';
+import 'package:maps_launcher/maps_launcher.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/scooter.dart';
 import '../models/scooter_manager.dart';
-import '../cloud_service.dart';
+import '../screens/settings_screen.dart';
 
 class ScooterSettingsScreen extends StatefulWidget {
   final Scooter scooter;
 
   const ScooterSettingsScreen({
-    required this.scooter,
     super.key,
+    required this.scooter,
   });
 
   @override
@@ -20,462 +23,586 @@ class ScooterSettingsScreen extends StatefulWidget {
 }
 
 class _ScooterSettingsScreenState extends State<ScooterSettingsScreen> {
-  final TextEditingController _nameController = TextEditingController();
-  int _selectedColor = 1;
-  bool _autoConnect = true;
-  Map<String, dynamic>? _cloudScooterData;
-  bool _isLoading = false;
+  final log = Logger('ScooterSettingsScreen');
+  bool showColorOnboarding = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController.text = widget.scooter.name;
-    _selectedColor = widget.scooter.color;
-    _autoConnect = widget.scooter.autoConnect;
-    _loadCloudData();
+    _checkColorOnboarding();
   }
 
-  Future<void> _loadCloudData() async {
-    if (widget.scooter.cloudScooterId != null) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        final manager = Provider.of<ScooterManager>(context, listen: false);
-        final cloudScooters = await manager.getCloudScooters();
-        final cloudScooter = cloudScooters.firstWhere(
-          (s) => s['id'] == widget.scooter.cloudScooterId,
-          orElse: () => throw Exception("Cloud scooter not found"),
-        );
-
-        setState(() {
-          _cloudScooterData = cloudScooter;
-          _isLoading = false;
-        });
-      } catch (e) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
+  Future<void> _checkColorOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      showColorOnboarding = prefs.getBool("color_onboarded") != true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final manager = Provider.of<ScooterManager>(context);
-    final isActive = manager.activeScooterId == widget.scooter.id;
+    final isActive = widget.scooter.id == manager.activeScooterId;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(FlutterI18n.translate(context, "scooter_settings_title")),
+        title: Text(widget.scooter.name),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Scooter image
-          Center(
-            child: Image.asset(
-              "images/scooter/side_${widget.scooter.color}.webp",
-              height: 160,
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
+          // Scooter image and color selection
+          _buildScooterVisual(context),
+
+          const SizedBox(height: 16),
+
           // Scooter name
-          TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: FlutterI18n.translate(context, "scooter_name"),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          
+          _buildNameSection(context),
+
           const SizedBox(height: 16),
-          
-          // Color selection
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    FlutterI18n.translate(context, "scooter_color"),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _buildColorOption(context, 0, "black"),
-                      _buildColorOption(context, 1, "white"),
-                      _buildColorOption(context, 2, "green"),
-                      _buildColorOption(context, 3, "gray"),
-                      _buildColorOption(context, 4, "orange"),
-                      _buildColorOption(context, 5, "red"),
-                      _buildColorOption(context, 6, "blue"),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
+
+          // Scooter details
+          _buildDetailsSection(context),
+
           const SizedBox(height: 16),
-          
-          // Auto-connect toggle
-          SwitchListTile(
-            title: Text(FlutterI18n.translate(context, "scooter_auto_connect")),
-            subtitle: Text(FlutterI18n.translate(context, "scooter_auto_connect_description")),
-            value: _autoConnect,
-            onChanged: (value) {
-              setState(() {
-                _autoConnect = value;
-              });
-            },
-          ),
-          
+
+          // Location section
+          if (widget.scooter.lastLocation != null)
+            _buildLocationSection(context),
+
           const SizedBox(height: 16),
-          
-          // Cloud connection section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    FlutterI18n.translate(context, "cloud_connection"),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else if (widget.scooter.cloudScooterId != null && _cloudScooterData != null)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ListTile(
-                          title: Text(FlutterI18n.translate(context, "cloud_scooter_name")),
-                          subtitle: Text(_cloudScooterData!['name'] ?? 'Unknown'),
-                          leading: const Icon(Icons.cloud_done),
-                        ),
-                        ListTile(
-                          title: Text(FlutterI18n.translate(context, "cloud_scooter_id")),
-                          subtitle: Text(widget.scooter.cloudScooterId.toString()),
-                        ),
-                        TextButton.icon(
-                          icon: const Icon(Icons.open_in_new),
-                          label: Text(FlutterI18n.translate(context, "cloud_open_dashboard")),
-                          onPressed: () async {
-                            final Uri url = Uri.parse(
-                              'https://sunshine.rescoot.org/scooters/${widget.scooter.cloudScooterId}',
-                            );
-                            if (await canLaunchUrl(url)) {
-                              await launchUrl(url, mode: LaunchMode.externalApplication);
-                            }
-                          },
-                        ),
-                        TextButton.icon(
-                          icon: const Icon(Icons.link_off),
-                          label: Text(FlutterI18n.translate(context, "cloud_unlink")),
-                          onPressed: () => _unlinkFromCloud(context),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(FlutterI18n.translate(context, "cloud_not_linked")),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.cloud_upload),
-                          label: Text(FlutterI18n.translate(context, "cloud_link_scooter")),
-                          onPressed: () => _showCloudLinkDialog(context),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-          
+
+          // Auto-connect setting
+          if (manager.scooters.length > 1)
+            _buildAutoConnectSection(context),
+
+          const SizedBox(height: 16),
+
+          // Cloud connection
+          _buildCloudSection(context),
+
           const SizedBox(height: 24),
-          
-          // Save button
-          ElevatedButton(
-            onPressed: () => _saveChanges(context),
-            child: Text(FlutterI18n.translate(context, "save_changes")),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Forget scooter button
-          TextButton.icon(
-            icon: const Icon(Icons.delete_outline),
-            label: Text(FlutterI18n.translate(context, "forget_scooter")),
-            onPressed: () => _showForgetDialog(context),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-          ),
+
+          // Action buttons
+          _buildActionButtons(context, isActive),
         ],
       ),
     );
   }
 
-  Widget _buildColorOption(BuildContext context, int colorValue, String colorName) {
-    final bool isSelected = _selectedColor == colorValue;
+  Widget _buildScooterVisual(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showColorPicker(context),
+      child: Column(
+        children: [
+          Image.asset(
+            "images/scooter/side_${widget.scooter.color}.webp",
+            height: 160,
+          ),
+          if (showColorOnboarding)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              child: Text(
+                FlutterI18n.translate(context, "settings_color_onboarding"),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNameSection(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.scooter.name,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => _showRenameDialog(context),
+                ),
+              ],
+            ),
+            const Divider(),
+            ListTile(
+              title: const Text("ID"),
+              subtitle: Text(widget.scooter.id),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailsSection(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              FlutterI18n.translate(context, "stats_title_scooter"),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              title: Text(FlutterI18n.translate(context, "stats_state")),
+              subtitle: Text(
+                widget.scooter.state != null 
+                  ? FlutterI18n.translate(context, "state_name_${widget.scooter.state.toString().split('.').last}")
+                  : FlutterI18n.translate(context, "state_name_disconnected"),
+              ),
+            ),
+            ListTile(
+              title: Text(FlutterI18n.translate(context, "stats_last_ping_title")),
+              subtitle: Text(
+                widget.scooter.lastConnection.toString().substring(0, 16),
+              ),
+              onTap: () {
+                Fluttertoast.showToast(
+                  msg: widget.scooter.lastConnection.toString().substring(0, 16),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationSection(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              FlutterI18n.translate(context, "stats_location"),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              title: Text(FlutterI18n.translate(context, "stats_last_seen_near")),
+              subtitle: Text(
+                "${widget.scooter.lastLocation!.latitude}, ${widget.scooter.lastLocation!.longitude}",
+              ),
+              trailing: const Icon(Icons.map_outlined),
+              onTap: () {
+                MapsLauncher.launchCoordinates(
+                  widget.scooter.lastLocation!.latitude,
+                  widget.scooter.lastLocation!.longitude,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAutoConnectSection(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              FlutterI18n.translate(context, "stats_settings_section_connection"),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: Text(FlutterI18n.translate(context, "stats_scooter_auto_connect")),
+              subtitle: Text(
+                widget.scooter.autoConnect
+                  ? FlutterI18n.translate(context, "stats_scooter_auto_connect_on_description")
+                  : FlutterI18n.translate(context, "stats_scooter_auto_connect_off_description"),
+              ),
+              value: widget.scooter.autoConnect,
+              onChanged: (value) {
+                setState(() {
+                  widget.scooter.autoConnect = value;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCloudSection(BuildContext context) {
+    final manager = Provider.of<ScooterManager>(context);
     
-    // Get color based on colorValue
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              FlutterI18n.translate(context, "stats_settings_section_cloud"),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            
+            if (widget.scooter.cloudScooterId != null)
+              ListTile(
+                title: Text(FlutterI18n.translate(context, "cloud_scooter_linked")),
+                subtitle: Text(FlutterI18n.translate(
+                  context, 
+                  "cloud_scooter_linked_id",
+                  translationParams: {"id": widget.scooter.cloudScooterId.toString()}
+                )),
+                trailing: IconButton(
+                  icon: const Icon(Icons.link_off),
+                  onPressed: () async {
+                    try {
+                      await manager.unlinkScooterFromCloud(widget.scooter.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(FlutterI18n.translate(context, "cloud_unlink_success"))),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(FlutterI18n.translate(context, "cloud_unlink_error"))),
+                      );
+                    }
+                  },
+                ),
+              )
+            else
+              ListTile(
+                title: Text(FlutterI18n.translate(context, "cloud_scooter_not_linked")),
+                subtitle: Text(FlutterI18n.translate(context, "cloud_scooter_not_linked_desc")),
+                trailing: IconButton(
+                  icon: const Icon(Icons.link),
+                  onPressed: () {
+                    // Navigate to cloud settings
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context, bool isActive) {
+    final manager = Provider.of<ScooterManager>(context);
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        if (!isActive)
+          ElevatedButton.icon(
+            icon: const Icon(Icons.bluetooth_connected),
+            label: Text(FlutterI18n.translate(context, "settings_connect")),
+            onPressed: () async {
+              try {
+                await manager.setActiveScooter(widget.scooter.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(FlutterI18n.translate(
+                      context, 
+                      "settings_connect_success",
+                      translationParams: {"name": widget.scooter.name}
+                    ))),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(FlutterI18n.translate(
+                      context, 
+                      "settings_connect_failed",
+                      translationParams: {"name": widget.scooter.name}
+                    ))),
+                  );
+                }
+              }
+            },
+          ),
+          
+        ElevatedButton.icon(
+          icon: const Icon(Icons.delete_outline),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
+          ),
+          label: Text(FlutterI18n.translate(context, "settings_forget")),
+          onPressed: () => _showForgetDialog(context),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showRenameDialog(BuildContext context) async {
+    final manager = Provider.of<ScooterManager>(context, listen: false);
+    final controller = TextEditingController(text: widget.scooter.name);
+    
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(FlutterI18n.translate(context, "stats_name")),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: FlutterI18n.translate(context, "stats_name"),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text(FlutterI18n.translate(context, "stats_rename_cancel")),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text(FlutterI18n.translate(context, "stats_rename_save")),
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  manager.renameSavedScooter(
+                    id: widget.scooter.id,
+                    name: controller.text,
+                  );
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showColorPicker(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    int selectedColor = widget.scooter.color;
+    
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(FlutterI18n.translate(context, "settings_color")),
+                  const SizedBox(height: 4),
+                  Text(
+                    FlutterI18n.translate(context, "settings_color_info"),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildColorOption(context, "black", 0, selectedColor, (value) {
+                      setState(() => selectedColor = value);
+                    }),
+                    _buildColorOption(context, "white", 1, selectedColor, (value) {
+                      setState(() => selectedColor = value);
+                    }),
+                    _buildColorOption(context, "green", 2, selectedColor, (value) {
+                      setState(() => selectedColor = value);
+                    }),
+                    _buildColorOption(context, "gray", 3, selectedColor, (value) {
+                      setState(() => selectedColor = value);
+                    }),
+                    _buildColorOption(context, "orange", 4, selectedColor, (value) {
+                      setState(() => selectedColor = value);
+                    }),
+                    _buildColorOption(context, "red", 5, selectedColor, (value) {
+                      setState(() => selectedColor = value);
+                    }),
+                    _buildColorOption(context, "blue", 6, selectedColor, (value) {
+                      setState(() => selectedColor = value);
+                    }),
+                    // Special colors for easter eggs
+                    if (_isSpecialName(widget.scooter.name, "Rpyvcfr"))
+                      _buildColorOption(context, "eclipse", 7, selectedColor, (value) {
+                        setState(() => selectedColor = value);
+                      }),
+                    if (_isSpecialName(widget.scooter.name, "Xbev"))
+                      _buildColorOption(context, "idioteque", 8, selectedColor, (value) {
+                        setState(() => selectedColor = value);
+                      }),
+                    if (_isSpecialName(widget.scooter.name, "Ubire"))
+                      _buildColorOption(context, "hover", 9, selectedColor, (value) {
+                        setState(() => selectedColor = value);
+                      }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: Text(FlutterI18n.translate(context, "stats_rename_cancel")),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                TextButton(
+                  child: Text(FlutterI18n.translate(context, "stats_rename_save")),
+                  onPressed: () {
+                    widget.scooter.color = selectedColor;
+                    
+                    // Mark color onboarding as completed
+                    if (showColorOnboarding) {
+                      prefs.setBool("color_onboarded", true);
+                      setState(() {
+                        showColorOnboarding = false;
+                      });
+                    }
+                    
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
+  }
+
+  Widget _buildColorOption(
+    BuildContext context,
+    String colorName,
+    int colorValue,
+    int selectedValue,
+    void Function(int) onChanged,
+  ) {
     Color color;
     switch (colorValue) {
-      case 0: color = Colors.black;
-      case 1: color = Colors.white;
-      case 2: color = Colors.green.shade900;
-      case 3: color = Colors.grey;
-      case 4: color = Colors.deepOrange.shade400;
-      case 5: color = Colors.red;
-      case 6: color = Colors.blue;
-      default: color = Colors.grey;
+      case 0:
+        color = Colors.black;
+        break;
+      case 1:
+        color = Colors.white;
+        break;
+      case 2:
+        color = Colors.green.shade900;
+        break;
+      case 3:
+        color = Colors.grey;
+        break;
+      case 4:
+        color = Colors.deepOrange.shade400;
+        break;
+      case 5:
+        color = Colors.red;
+        break;
+      case 6:
+        color = Colors.blue;
+        break;
+      case 7:
+        color = Colors.grey.shade800;
+        break;
+      case 8:
+        color = Colors.teal.shade200;
+        break;
+      case 9:
+        color = Colors.lightBlue;
+        break;
+      default:
+        color = Colors.black;
     }
     
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedColor = colorValue;
-        });
-      },
-      child: Container(
-        width: 60,
-        height: 60,
+    return RadioListTile<int>(
+      title: Text(FlutterI18n.translate(context, "color_$colorName")),
+      value: colorValue,
+      groupValue: selectedValue,
+      onChanged: (value) => onChanged(value!),
+      secondary: Container(
+        width: 24,
+        height: 24,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
           border: Border.all(
-            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade300,
-            width: isSelected ? 3 : 1,
+            color: Colors.grey.shade500,
+            width: 1,
           ),
         ),
-        child: isSelected
-            ? Icon(
-                Icons.check,
-                color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
-              )
-            : null,
       ),
     );
-  }
-
-  Future<void> _saveChanges(BuildContext context) async {
-    final manager = Provider.of<ScooterManager>(context, listen: false);
-    
-    // Update scooter name if changed
-    if (_nameController.text != widget.scooter.name) {
-      await manager.renameSavedScooter(
-        id: widget.scooter.id,
-        name: _nameController.text,
-      );
-    }
-    
-    // Update color if changed
-    if (_selectedColor != widget.scooter.color) {
-      widget.scooter.color = _selectedColor;
-    }
-    
-    // Update auto-connect if changed
-    if (_autoConnect != widget.scooter.autoConnect) {
-      widget.scooter.autoConnect = _autoConnect;
-    }
-    
-    Navigator.of(context).pop();
   }
 
   Future<void> _showForgetDialog(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(FlutterI18n.translate(context, "forget_scooter_title")),
-        content: Text(FlutterI18n.translate(context, "forget_scooter_message")),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(FlutterI18n.translate(context, "cancel")),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(
-              FlutterI18n.translate(context, "forget"),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-        ],
-      ),
-    );
-    
-    if (confirmed == true) {
-      final manager = Provider.of<ScooterManager>(context, listen: false);
-      await manager.removeScooter(widget.scooter.id);
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    }
-  }
-
-  Future<void> _showCloudLinkDialog(BuildContext context) async {
     final manager = Provider.of<ScooterManager>(context, listen: false);
     
-    // Check if authenticated
-    final isAuthenticated = await manager.isCloudAuthenticated();
-    if (!isAuthenticated && mounted) {
-      // Show authentication dialog
-      final token = await _showCloudAuthDialog(context);
-      if (token == null) return;
-      
-      final success = await manager.authenticateCloud(token);
-      if (!success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(FlutterI18n.translate(context, "cloud_auth_failed"))),
-        );
-        return;
-      }
-    }
-    
-    if (!mounted) return;
-    
-    // Show cloud scooter selection dialog
-    final cloudScooters = await manager.getCloudScooters();
-    if (!mounted) return;
-    
-    if (cloudScooters.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(FlutterI18n.translate(context, "cloud_no_scooters"))),
-      );
-      return;
-    }
-    
-    final selectedCloudScooter = await showDialog<Map<String, dynamic>>(
+    return showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(FlutterI18n.translate(context, "cloud_select_scooter")),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: cloudScooters.length,
-            itemBuilder: (context, index) {
-              final scooter = cloudScooters[index];
-              return ListTile(
-                title: Text(scooter['name'] ?? 'Unknown'),
-                subtitle: Text('ID: ${scooter['id']}'),
-                onTap: () => Navigator.of(context).pop(scooter),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(FlutterI18n.translate(context, "cancel")),
-          ),
-        ],
-      ),
-    );
-    
-    if (selectedCloudScooter != null && mounted) {
-      try {
-        await manager.linkScooterToCloud(
-          scooterId: widget.scooter.id,
-          cloudScooterId: selectedCloudScooter['id'],
-        );
-        
-        // Reload cloud data
-        await _loadCloudData();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(FlutterI18n.translate(context, "cloud_link_failed"))),
-          );
-        }
-      }
-    }
-  }
-
-  Future<String?> _showCloudAuthDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(FlutterI18n.translate(context, "cloud_auth_title")),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(FlutterI18n.translate(context, "cloud_auth_message")),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                labelText: FlutterI18n.translate(context, "cloud_auth_token"),
-                border: const OutlineInputBorder(),
-              ),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(FlutterI18n.translate(context, "forget_alert_title")),
+          content: Text(FlutterI18n.translate(context, "forget_alert_body")),
+          actions: [
+            TextButton(
+              child: Text(FlutterI18n.translate(context, "forget_alert_cancel")),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text(FlutterI18n.translate(context, "forget_alert_confirm")),
+              onPressed: () async {
+                final scooterName = widget.scooter.name;
+                await manager.removeScooter(widget.scooter.id);
+                
+                if (mounted) {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Return to previous screen
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(FlutterI18n.translate(
+                      context,
+                      "forget_alert_success",
+                      translationParams: {"name": scooterName},
+                    ))),
+                  );
+                }
+              },
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(FlutterI18n.translate(context, "cancel")),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: Text(FlutterI18n.translate(context, "authenticate")),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Future<void> _unlinkFromCloud(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(FlutterI18n.translate(context, "cloud_unlink_title")),
-        content: Text(FlutterI18n.translate(context, "cloud_unlink_message")),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(FlutterI18n.translate(context, "cancel")),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(FlutterI18n.translate(context, "unlink")),
-          ),
-        ],
-      ),
-    );
-    
-    if (confirmed == true) {
-      final manager = Provider.of<ScooterManager>(context, listen: false);
-      await manager.unlinkScooterFromCloud(widget.scooter.id);
-      
-      setState(() {
-        _cloudScooterData = null;
-      });
-    }
+  bool _isSpecialName(String name, String encoded) {
+    return name == _rot13(encoded);
+  }
+
+  String _rot13(String input) {
+    return input.split('').map((char) {
+      if (RegExp(r'[a-z]').hasMatch(char)) {
+        return String.fromCharCode(((char.codeUnitAt(0) - 97 + 13) % 26) + 97);
+      } else if (RegExp(r'[A-Z]').hasMatch(char)) {
+        return String.fromCharCode(((char.codeUnitAt(0) - 65 + 13) % 26) + 65);
+      } else {
+        return char;
+      }
+    }).join('');
   }
 }

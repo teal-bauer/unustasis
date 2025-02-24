@@ -235,8 +235,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context, Scooter? activeScooter) {
-    final manager = Provider.of<ScooterManager>(context);
-    final bool connected = manager.connected;
     final scooterState = activeScooter?.state;
     
       // If no scooters are added yet, show a big "Add Scooter" button
@@ -274,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
               FlutterI18n.translate(context, "add_scooter_description"),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],

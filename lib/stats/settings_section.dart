@@ -12,8 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../domain/log_helper.dart';
 import '../domain/scooter_keyless_distance.dart';
 import '../domain/theme_helper.dart';
-import '../scooter_service.dart';
-import '../screens/control_screen.dart';
+import '../models/scooter_manager.dart';
 import '../screens/support_screen.dart';
 import '../stats/cloud_settings_section.dart';
 
@@ -35,15 +34,15 @@ class _SettingsSectionState extends State<SettingsSection> {
   bool osmConsent = true;
 
   void getInitialSettings() async {
-    ScooterService service = context.read<ScooterService>();
+    final manager = context.read<ScooterManager>();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       biometrics = prefs.getBool("biometrics") ?? false;
-      autoUnlock = service.autoUnlock;
+      autoUnlock = manager.autoUnlock;
       autoUnlockDistance =
-          ScooterKeylessDistance.fromThreshold(service.autoUnlockThreshold) ?? ScooterKeylessDistance.regular.threshold;
-      openSeatOnUnlock = service.openSeatOnUnlock;
-      hazardLocking = service.hazardLocking;
+          ScooterKeylessDistance.fromThreshold(manager.autoUnlockThreshold);
+      openSeatOnUnlock = manager.openSeatOnUnlock;
+      hazardLocking = manager.hazardLocking;
       osmConsent = prefs.getBool("osmConsent") ?? true;
       seasonal = prefs.getBool("seasonal") ?? true;
     });
@@ -63,7 +62,7 @@ class _SettingsSectionState extends State<SettingsSection> {
           subtitle: Text(FlutterI18n.translate(context, "settings_auto_unlock_description")),
           value: autoUnlock,
           onChanged: (value) async {
-            context.read<ScooterService>().setAutoUnlock(value);
+            context.read<ScooterManager>().setAutoUnlock(value);
             setState(() {
               autoUnlock = value;
             });
@@ -81,7 +80,7 @@ class _SettingsSectionState extends State<SettingsSection> {
               label: autoUnlockDistance.getFormattedThreshold(),
               onChanged: (threshold) async {
                 var distance = ScooterKeylessDistance.fromThreshold(threshold.toInt());
-                context.read<ScooterService>().setAutoUnlockThreshold(threshold.toInt());
+                context.read<ScooterManager>().setAutoUnlockThreshold(threshold.toInt());
                 setState(() {
                   autoUnlockDistance = distance;
                 });
@@ -94,7 +93,7 @@ class _SettingsSectionState extends State<SettingsSection> {
           subtitle: Text(FlutterI18n.translate(context, "settings_open_seat_on_unlock_description")),
           value: openSeatOnUnlock,
           onChanged: (value) async {
-            context.read<ScooterService>().setOpenSeatOnUnlock(value);
+            context.read<ScooterManager>().setOpenSeatOnUnlock(value);
             setState(() {
               openSeatOnUnlock = value;
             });
@@ -106,7 +105,7 @@ class _SettingsSectionState extends State<SettingsSection> {
           subtitle: Text(FlutterI18n.translate(context, "settings_hazard_locking_description")),
           value: hazardLocking,
           onChanged: (value) async {
-            context.read<ScooterService>().setHazardLocking(value);
+            context.read<ScooterManager>().setHazardLocking(value);
             setState(() {
               hazardLocking = value;
             });
@@ -318,6 +317,27 @@ class _SettingsSectionState extends State<SettingsSection> {
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
       ),
       itemBuilder: (context, index) => settingsItems()[index],
+    );
+  }
+}
+
+class Header extends StatelessWidget {
+  final String text;
+
+  const Header(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
     );
   }
 }

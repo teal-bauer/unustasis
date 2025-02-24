@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
-import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 
 import '../cloud_service.dart';
@@ -30,7 +29,6 @@ class StatusText extends StatelessWidget {
 
   Widget _buildCloudStatus(BuildContext context, Scooter scooter) {
     final cloudService = CloudService(Provider.of<ScooterManager>(context));
-    final log = Logger('StatusText/CloudStatus');
 
     return StreamBuilder<bool>(
       stream: Stream.periodic(const Duration(seconds: 5))

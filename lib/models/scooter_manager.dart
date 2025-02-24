@@ -58,6 +58,15 @@ class ScooterManager with ChangeNotifier {
   bool get openSeatOnUnlock => _openSeatOnUnlock;
   bool get hazardLocking => _hazardLocking;
   bool get optionalAuth => _optionalAuth;
+  
+  // Background service compatibility getters
+  ScooterState? get state => activeScooter?.state;
+  DateTime? get lastPing => activeScooter?.lastConnection;
+  int? get primarySOC => activeScooter?.primarySOC;
+  int? get secondarySOC => activeScooter?.secondarySOC;
+  String? get scooterName => activeScooter?.name;
+  LatLng? get lastLocation => activeScooter?.lastLocation;
+  bool? get seatClosed => activeScooter?.seatClosed;
 
   // Constructor
   ScooterManager(this._flutterBluePlus, {bool isInBackgroundService = false}) {
@@ -224,6 +233,18 @@ class ScooterManager with ChangeNotifier {
       setActiveScooter(mostRecent.id);
     }
   }
+  
+  // Background service compatibility method
+  void setMostRecentScooter(String id) async {
+    if (_scooters.containsKey(id)) {
+      _scooters[id]!.updateLastConnection(DateTime.now());
+      await _saveScooters();
+      
+      if (_activeScooterId != id) {
+        setActiveScooter(id);
+      }
+    }
+  }
 
   // Save all scooters to preferences
   Future<void> _saveScooters() async {
@@ -278,6 +299,23 @@ class ScooterManager with ChangeNotifier {
     }
 
     notifyListeners();
+  }
+  
+  // Get saved scooter IDs (for background service)
+  Future<List<String>> getSavedScooterIds({bool onlyAutoConnect = false}) async {
+    if (onlyAutoConnect) {
+      return _scooters.values
+          .where((scooter) => scooter.autoConnect)
+          .map((scooter) => scooter.id)
+          .toList();
+    } else {
+      return _scooters.keys.toList();
+    }
+  }
+  
+  // Alias for removeScooter (for background service)
+  Future<void> forgetSavedScooter(String scooterId) async {
+    await removeScooter(scooterId);
   }
 
   // Remove a scooter
@@ -375,6 +413,11 @@ class ScooterManager with ChangeNotifier {
       preferSavedIds: false,
     );
   }
+  
+  // Public method to start scanning for scooters
+  Future<void> startScanning() async {
+    return _startScan();
+  }
 
   // Start auto-reconnection
   void startAutoReconnect() {
@@ -394,6 +437,23 @@ class ScooterManager with ChangeNotifier {
     }
     // Check cloud availability
     return await _cloudCommands.isAvailable(command);
+  }
+  
+  // Background service compatibility methods for common commands
+  Future<void> lock() async {
+    await executeCommand(CommandType.lock);
+  }
+  
+  Future<void> unlock() async {
+    await executeCommand(CommandType.unlock);
+  }
+  
+  Future<void> openSeat() async {
+    await executeCommand(CommandType.openSeat);
+  }
+  
+  Future<void> wakeUp() async {
+    await executeCommand(CommandType.wakeUp);
   }
 
   Future<void> executeCommand(
@@ -557,6 +617,50 @@ class ScooterManager with ChangeNotifier {
       return false;
     }
   }
+  
+  // Background service compatibility method
+  Future<bool> attemptLatestAutoConnection() async {
+    if (_scooters.isEmpty) return false;
+    
+    // Find the most recent auto-connect scooter
+    Scooter? mostRecent;
+    for (var scooter in _scooters.values) {
+      if (scooter.autoConnect && (mostRecent == null || scooter.lastConnection.isAfter(mostRecent.lastConnection))) {
+        mostRecent = scooter;
+      }
+    }
+    
+    if (mostRecent == null) return false;
+    
+    try {
+      await setActiveScooter(mostRecent.id);
+      await attemptToConnectToActiveScooter();
+      return connected;
+    } catch (e) {
+      log.warning("Failed to auto-connect to latest scooter", e);
+      return false;
+    }
+  }
+  
+  // Background service compatibility method for auto-restart
+  void startAutoRestart() {
+    startAutoReconnect();
+  }
+  
+  // Background service compatibility method for stopping auto-restart
+  void stopAutoRestart() {
+    stopAutoReconnect();
+  }
+  
+  // Background service compatibility method for connecting to a specific scooter
+  Future<void> connectToScooterId(String id) async {
+    if (_scooters.containsKey(id)) {
+      await setActiveScooter(id);
+      await attemptToConnectToActiveScooter();
+    } else {
+      throw Exception("Scooter with ID $id not found");
+    }
+  }
 
   Future<bool> isCloudAuthenticated() async {
     return await _cloudService.isAuthenticated;
@@ -593,6 +697,29 @@ class ScooterManager with ChangeNotifier {
       }
     }
 
+    notifyListeners();
+  }
+  
+  // Add a scooter from cloud data
+  Future<void> addCloudScooter(Map<String, dynamic> cloudScooter) async {
+    // Create a new scooter with cloud data
+    final scooter = Scooter(
+      id: "cloud_${cloudScooter['id']}",
+      name: cloudScooter['name'] ?? "Cloud Scooter",
+      color: cloudScooter['color_id'] ?? 1,
+      cloudScooterId: cloudScooter['id'],
+      lastCloudSync: DateTime.now(),
+    );
+    
+    // Add the scooter
+    await addScooter(scooter);
+    
+    // Update with cloud data
+    scooter.updateCloudConnection(
+      connected: true,
+      cloudData: cloudScooter,
+    );
+    
     notifyListeners();
   }
 

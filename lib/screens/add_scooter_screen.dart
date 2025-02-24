@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../models/scooter_manager.dart';
 import '../cloud_service.dart';
+import 'ble_scooter_selection_screen.dart';
+import 'settings_screen.dart';
 
 class AddScooterScreen extends StatefulWidget {
   const AddScooterScreen({super.key});
@@ -46,28 +48,10 @@ class _AddScooterScreenState extends State<AddScooterScreen> {
   }
 
   void _startBleSearch() {
-    final manager = Provider.of<ScooterManager>(context, listen: false);
-    
-    setState(() {
-      _isSearching = true;
-    });
-    
-    manager.startScanning().then((_) {
-      if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
-      }
-    }).catchError((e) {
-      if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(FlutterI18n.translate(context, "add_scooter_scan_error"))),
-        );
-      }
-    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const BleScooterSelectionScreen()),
+    );
   }
 
   void _showCloudScooters() {
@@ -165,7 +149,10 @@ class _AddScooterScreenState extends State<AddScooterScreen> {
   }
 
   void _showCloudLogin() {
-    Navigator.pushNamed(context, '/settings');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+    );
   }
 
   @override

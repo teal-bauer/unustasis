@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/scooter.dart';
 import '../models/scooter_manager.dart';
+import '../screens/add_scooter_screen.dart';
 import '../screens/scooter_settings_screen.dart';
 
 class ScooterSelectionDialog extends StatelessWidget {
@@ -108,7 +109,11 @@ class ScooterSelectionDialog extends StatelessWidget {
                       onAddPressed!();
                     } else {
                       // Default add scooter action
-                      // TODO: Navigate to add scooter screen
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const AddScooterScreen(),
+                        ),
+                      );
                     }
                   },
                 ),

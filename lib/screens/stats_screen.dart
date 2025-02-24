@@ -1,13 +1,13 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:logging/logging.dart';
+import 'package:maps_launcher/maps_launcher.dart';
 import 'package:provider/provider.dart';
 
-import '../stats/settings_section.dart';
-import '../scooter_service.dart';
-import '../stats/battery_section.dart';
-import '../stats/scooter_section.dart';
+import '../domain/scooter_state.dart';
+import '../geo_helper.dart';
+import '../models/scooter.dart';
+import '../models/scooter_manager.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -17,189 +17,325 @@ class StatsScreen extends StatefulWidget {
 }
 
 class _StatsScreenState extends State<StatsScreen> {
-  @override
-  void initState() {
-    super.initState();
-  }
+  final log = Logger('StatsScreen');
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          title: Text(FlutterI18n.translate(context, 'stats_title')),
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(50.0),
-              child: TabBar(
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.center,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 24),
-                  unselectedLabelColor:
-                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                  labelColor: Theme.of(context).colorScheme.onSurface,
-                  indicatorColor: Theme.of(context).colorScheme.onSurface,
-                  dividerColor: Colors.transparent,
-                  tabs: [
-                    Tab(
-                      child: Text(
-                        FlutterI18n.translate(context, 'stats_title_battery'),
-                        style: const TextStyle(
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    Tab(
-                      child: Text(
-                        FlutterI18n.translate(context, 'stats_title_scooter'),
-                        style: const TextStyle(
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    Tab(
-                      child: Text(
-                        FlutterI18n.translate(context, 'stats_title_settings'),
-                        style: const TextStyle(
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ])),
-          actions: [
-            Selector<ScooterService, DateTime?>(
-              selector: (context, service) => service.lastPing,
-              builder: (context, lastPing, _) {
-                return LastPingInfo(
-                  lastPing: lastPing,
-                  onDebugLongPress: context.read<ScooterService>().addDemoData,
+    final manager = Provider.of<ScooterManager>(context);
+    final activeScooter = manager.activeScooter;
+
+    if (activeScooter == null) {
+      return _buildNoScooterScreen(context);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(FlutterI18n.translate(context, 'stats_title')),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Battery Section
+          _buildBatterySection(context, activeScooter),
+
+          const SizedBox(height: 16),
+
+          // Scooter Details Section
+          _buildScooterDetailsSection(context, activeScooter),
+
+          const SizedBox(height: 16),
+
+          // Location Section
+          if (activeScooter.lastLocation != null)
+            _buildLocationSection(context, activeScooter),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoScooterScreen(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(FlutterI18n.translate(context, 'stats_title')),
+      ),
+      body: Center(
+        child: Text(
+          FlutterI18n.translate(context, 'stats_no_name'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBatterySection(BuildContext context, Scooter scooter) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              FlutterI18n.translate(context, 'stats_title_battery'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            
+            // Total Range
+            Text(
+              '${scooter.calculateRange()} km ${FlutterI18n.translate(context, "stats_total_range")}',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            Text(
+              FlutterI18n.translate(
+                context, 
+                "stats_range_until_throttled", 
+                translationParams: {
+                  "range": "${scooter.calculateNonThrottledRange()}"
+                }
+              ),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+
+            const SizedBox(height: 16),
+
+            // Battery Details
+            if (scooter.primarySOC != null)
+              _buildBatteryDetailRow(
+                context, 
+                FlutterI18n.translate(context, 'stats_primary_name'), 
+                scooter.primarySOC!, 
+                scooter.primaryCycles
+              ),
+
+            if (scooter.secondarySOC != null && scooter.secondarySOC! > 0)
+              _buildBatteryDetailRow(
+                context, 
+                FlutterI18n.translate(context, 'stats_secondary_name'), 
+                scooter.secondarySOC!, 
+                scooter.secondaryCycles
+              ),
+
+            if (scooter.cbbSOC != null)
+              _buildInternalBatteryRow(
+                context, 
+                FlutterI18n.translate(context, 'stats_cbb_name'), 
+                scooter.cbbSOC!,
+                charging: scooter.cbbCharging
+              ),
+
+            if (scooter.auxSOC != null)
+              _buildInternalBatteryRow(
+                context, 
+                FlutterI18n.translate(context, 'stats_aux_name'), 
+                scooter.auxSOC!
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBatteryDetailRow(BuildContext context, String label, int soc, int? cycles) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: LinearProgressIndicator(
+              value: soc / 100,
+              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+              color: soc <= 15 
+                  ? Theme.of(context).colorScheme.error 
+                  : Theme.of(context).colorScheme.primary,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: Text(
+                '$soc%',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: soc <= 15 
+                      ? Theme.of(context).colorScheme.error 
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          if (cycles != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              FlutterI18n.translate(
+                context, 
+                'stats_cycles', 
+                translationParams: {'cycles': cycles.toString()}
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInternalBatteryRow(
+    BuildContext context, 
+    String label, 
+    int soc, 
+    {bool? charging}
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          Text(
+            '$soc%',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          if (charging != null) ...[
+            const SizedBox(width: 8),
+            Icon(
+              charging ? Icons.battery_charging_full : Icons.battery_std,
+              size: 16,
+              color: charging 
+                  ? Theme.of(context).colorScheme.primary 
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScooterDetailsSection(BuildContext context, Scooter scooter) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              FlutterI18n.translate(context, 'stats_title_scooter'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            
+            // Scooter State
+            _buildDetailRow(
+              context,
+              FlutterI18n.translate(context, 'stats_state'),
+              scooter.state?.name(context) ?? 
+                FlutterI18n.translate(context, 'stats_unknown')
+            ),
+
+            // Connection Status
+            _buildDetailRow(
+              context,
+              'BLE',
+              scooter.bleConnected 
+                ? FlutterI18n.translate(context, 'ble_connected')
+                : FlutterI18n.translate(context, 'ble_disconnected')
+            ),
+
+            if (scooter.cloudScooterId != null)
+              _buildDetailRow(
+                context,
+                FlutterI18n.translate(context, 'cloud_scooter_linked'),
+                scooter.cloudConnected 
+                  ? FlutterI18n.translate(context, 'cloud_connected')
+                  : FlutterI18n.translate(context, 'cloud_disconnected')
+              ),
+
+            // Scooter ID
+            _buildDetailRow(
+              context,
+              FlutterI18n.translate(context, 'stats_scooter_id'),
+              scooter.id
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationSection(BuildContext context, Scooter scooter) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              FlutterI18n.translate(context, 'stats_location'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            
+            // Last Known Location
+            ListTile(
+              leading: const Icon(Icons.location_on_outlined),
+              title: Text(
+                FlutterI18n.translate(context, 'stats_last_seen_near'),
+              ),
+              subtitle: FutureBuilder<String?>(
+                future: GeoHelper.getAddress(scooter.lastLocation, context),
+                builder: (context, snapshot) {
+                  return Text(
+                    snapshot.data ?? 
+                    '${scooter.lastLocation!.latitude}, ${scooter.lastLocation!.longitude}'
+                  );
+                },
+              ),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () {
+                MapsLauncher.launchCoordinates(
+                  scooter.lastLocation!.latitude,
+                  scooter.lastLocation!.longitude,
                 );
               },
             ),
           ],
         ),
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment.center,
-              radius: 1.3,
-              colors: [
-                Theme.of(context).colorScheme.surface,
-                Theme.of(context).colorScheme.surface,
-              ],
-            ),
-          ),
-          child: SafeArea(
-            child: Selector<ScooterService, DateTime?>(
-                selector: (context, service) => service.lastPing,
-                builder: (context, lastPing, _) {
-                  bool dataIsOld = lastPing == null ||
-                      lastPing.difference(DateTime.now()).inMinutes.abs() > 5;
-                  return TabBarView(
-                    children: [
-                      // BATTERY TAB
-                      BatterySection(dataIsOld: dataIsOld),
-                      // SCOOTER TAB
-                      ScooterSection(dataIsOld: dataIsOld),
-                      // SETTINGS TAB
-                      const SettingsSection(),
-                    ],
-                  );
-                }),
-          ),
-        ),
       ),
     );
   }
-}
 
-class LastPingInfo extends StatelessWidget {
-  const LastPingInfo({
-    super.key,
-    this.lastPing,
-    this.onDebugLongPress,
-  });
-
-  final DateTime? lastPing;
-  final void Function()? onDebugLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onLongPress: () {
-        if (kDebugMode && onDebugLongPress != null) {
-          onDebugLongPress!();
-        }
-      },
-      child: InkWell(
-        onTap: () {
-          String timeDiff = lastPing?.calculateTimeDifferenceInShort(context) ??
-              "???"; // somehow, we are here even though there never was a ping?
-          if (timeDiff ==
-              FlutterI18n.translate(context, "stats_last_ping_now")) {
-            Fluttertoast.showToast(
-              msg: FlutterI18n.translate(context, "stats_last_ping_toast_now"),
-            );
-          } else {
-            Fluttertoast.showToast(
-              msg: FlutterI18n.translate(context, "stats_last_ping_toast",
-                  translationParams: {"time": timeDiff.toLowerCase()}),
-            );
-          }
-        },
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              lastPing?.calculateTimeDifferenceInShort(context) ?? "???",
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(
-              width: 4,
-            ),
-            Icon(
-              Icons.schedule_rounded,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              size: 24,
-            ),
-            const SizedBox(
-              width: 32,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
-  }
-}
-
-extension DateTimeExtension on DateTime {
-  String calculateTimeDifferenceInShort(BuildContext context) {
-    final originalDate = DateTime.now();
-    final difference = originalDate.difference(this);
-
-    if ((difference.inDays / 7).floor() >= 1) {
-      return '1W';
-    } else if (difference.inDays >= 2) {
-      return '${difference.inDays}D';
-    } else if (difference.inDays >= 1) {
-      return '1D';
-    } else if (difference.inHours >= 2) {
-      return '${difference.inHours}H';
-    } else if (difference.inHours >= 1) {
-      return '1H';
-    } else if (difference.inMinutes >= 2) {
-      return '${difference.inMinutes}M';
-    } else if (difference.inMinutes >= 1) {
-      return '1M';
-    } else {
-      return FlutterI18n.translate(context, "stats_last_ping_now");
-    }
   }
 }

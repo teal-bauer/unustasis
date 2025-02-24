@@ -11,39 +11,41 @@ import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../background/bg_service.dart';
 import '../domain/log_helper.dart';
 import '../flutter/blue_plus_mockable.dart';
-import 'background/bg_service.dart';
-import 'scooter_service.dart';
-import 'screens/home_screen.dart';
+import '../models/scooter_manager.dart';
+import '../screens/home_screen.dart';
 
 void main() async {
   LogHelper().initialize();
-  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: WidgetsFlutterBinding.ensureInitialized());
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
-  Locale? savedLocale;
 
+  Locale? savedLocale;
   SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? localeString = prefs.getString('savedLocale');
+
   if (localeString != null) {
     Logger("Main").fine("Saved locale: $localeString");
     savedLocale = Locale(localeString);
   } else {
-    // we have no language saved, so we pass along the device language
+    // Use device language
     savedLocale = Locale(Platform.localeName.split('_').first);
   }
 
-  // here goes nothing...
+  // Setup background service
   setupBackgroundService();
 
   runApp(ChangeNotifierProvider(
-      create: (context) => ScooterService(FlutterBluePlusMockable()),
-      child: EasyDynamicThemeWidget(
-        child: UnustasisApp(
-          savedLocale: savedLocale,
-        ),
-      )));
+    create: (context) => ScooterManager(FlutterBluePlusMockable()),
+    child: EasyDynamicThemeWidget(
+      child: UnustasisApp(
+        savedLocale: savedLocale,
+      ),
+    ),
+  ));
 }
 
 class UnustasisApp extends StatefulWidget {
@@ -78,7 +80,6 @@ class _UnustasisAppState extends State<UnustasisApp> {
           error: Colors.red,
           onError: Colors.black,
         ),
-        /* dark theme settings */
       ),
       darkTheme: ThemeData(
         appBarTheme: const AppBarTheme(
@@ -99,7 +100,6 @@ class _UnustasisAppState extends State<UnustasisApp> {
           error: Colors.red,
           onError: Colors.white,
         ),
-        /* dark theme settings */
       ),
       themeMode: EasyDynamicTheme.of(context).themeMode,
       localizationsDelegates: [
@@ -111,7 +111,7 @@ class _UnustasisAppState extends State<UnustasisApp> {
             forcedLocale: widget.savedLocale,
           ),
           missingTranslationHandler: (key, locale) {
-            Logger("Main").warning("--- Missing Key: $key, languageCode: ${locale?.languageCode}");
+            Logger("Main").warning("--- [i18n] Missing Key: $key, languageCode: ${locale?.languageCode}");
           },
         ),
       ],

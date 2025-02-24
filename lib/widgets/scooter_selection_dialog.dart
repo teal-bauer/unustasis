@@ -6,7 +6,7 @@ import '../models/scooter.dart';
 import '../models/scooter_manager.dart';
 import 'scooter_card.dart';
 import '../screens/add_scooter_screen.dart';
-import '../screens/scooter_details_screen.dart';
+import '../screens/scooter_settings_screen.dart';
 
 class ScooterSelectionDialog extends StatelessWidget {
   const ScooterSelectionDialog({super.key});
@@ -84,7 +84,7 @@ class ScooterSelectionDialog extends StatelessWidget {
                             Navigator.of(context).pop();
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (context) => ScooterDetailsScreen(scooter: scooter),
+                                builder: (context) => ScooterSettingsScreen(scooter: scooter),
                               ),
                             );
                           },

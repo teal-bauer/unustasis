@@ -3,10 +3,9 @@ import 'package:flutter_i18n/flutter_i18n.dart';
 import 'package:intl/intl.dart';
 
 class FormatUtils {
-  static String formatLastSeen(String lastSeenStr, {bool short = false}) {
-    final lastSeen = DateTime.parse(lastSeenStr);
+  static String formatLastSeen(DateTime time, {bool short = false}) {
     final now = DateTime.now();
-    final difference = now.difference(lastSeen);
+    final difference = now.difference(time);
     
     if (short) {
       if (difference.inMinutes < 60) {
@@ -24,6 +23,32 @@ class FormatUtils {
       return '${difference.inMinutes}m ago';
     } else if (difference.inHours < 24) {
       return '${difference.inHours}h ago';
+    } else {
+      return DateFormat('MMM d, HH:mm').format(time);
+    }
+  }
+
+  static String formatTimeAgo(String lastSeenStr, {bool short = false}) {
+    final lastSeen = DateTime.parse(lastSeenStr);
+    final now = DateTime.now();
+    final difference = now.difference(lastSeen);
+    
+    if (short) {
+      if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}h';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}d';
+      } else {
+        return '${(difference.inDays / 7).floor()}w';
+      }
+    }
+
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h';
     } else {
       return DateFormat('MMM d, HH:mm').format(lastSeen);
     }

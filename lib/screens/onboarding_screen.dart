@@ -14,7 +14,7 @@ import 'package:provider/provider.dart';
 import '../domain/scooter_state.dart';
 import '../domain/theme_helper.dart';
 import '../scooter_service.dart';
-import '../scooter_visual.dart';
+import '../widgets/scooter_visual.dart';
 import 'home_screen.dart';
 import 'support_screen.dart';
 

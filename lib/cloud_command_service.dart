@@ -2,22 +2,18 @@ import 'package:logging/logging.dart';
 
 import 'cloud_service.dart';
 import 'command_service.dart';
+import 'models/scooter_manager.dart';
 
 class CloudCommandService implements CommandService {
   final CloudService cloudService;
-  final int? Function() getCloudScooterId;
+  final ScooterManager scooterManager;
   final Logger log = Logger('CloudCommandService');
 
-  CloudCommandService(this.cloudService, this.getCloudScooterId);
+  CloudCommandService(this.cloudService, this.scooterManager);
 
   @override
   Future<bool> isAvailable(CommandType command) async {
-    log.info([
-      "CloudCommandService.isAvailable",
-      await cloudService.isAuthenticated,
-      getCloudScooterId()
-    ]);
-    if (!await cloudService.isAuthenticated || getCloudScooterId() == null) {
+    if (!await cloudService.isAuthenticated || scooterManager.activeScooterId == null) {
       return false;
     }
     return true; // All commands available via cloud
@@ -25,14 +21,9 @@ class CloudCommandService implements CommandService {
 
   @override
   Future<bool> execute(CommandType command) async {
-    if (!await isAvailable(command)) {
-      return false;
-    }
+    final currentId = scooterManager.activeScooterId != null ? scooterManager.activeScooter?.cloudScooterId : null;
 
-    final currentId = getCloudScooterId();
-    if (currentId == null) {
-      return false;
-    }
+    if (currentId == null) return false;
 
     log.info(["executing command", command]);
 

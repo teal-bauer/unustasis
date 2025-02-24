@@ -15,8 +15,8 @@ import '../domain/theme_helper.dart';
 import '../helper_widgets/snowfall.dart';
 import '../models/scooter.dart';
 import '../models/scooter_manager.dart';
-import '../scooter_service.dart';
 import '../widgets/battery_bars.dart';
+import '../widgets/connection_status_icons.dart';
 import '../widgets/scooter_action_button.dart';
 import '../widgets/scooter_power_button.dart';
 import '../widgets/scooter_selection_dialog.dart';
@@ -178,47 +178,57 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTopBar(BuildContext context, Scooter? activeScooter) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Scooter selector button
-        IconButton(
-          icon: const Icon(Icons.electric_scooter),
-          onPressed: () => _showScooterSelectionDialog(context),
-          tooltip: FlutterI18n.translate(context, 'switch_scooter'),
-        ),
-        
-        const SizedBox(width: 8),
-        
-        // Scooter name with info screen link
-        Expanded(
-          child: GestureDetector(
-            onTap: () => _navigateToStats(context),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  activeScooter?.name ?? 
-                      FlutterI18n.translate(context, "stats_no_name"),
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                ),
-              ],
+        // First row with scooter selection and name
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Scooter selector button
+            IconButton(
+              icon: const Icon(Icons.electric_scooter),
+              onPressed: () => _showScooterSelectionDialog(context),
+              tooltip: FlutterI18n.translate(context, 'switch_scooter'),
             ),
-          ),
+            
+            const SizedBox(width: 8),
+            
+            // Scooter name
+            Expanded(
+              child: Text(
+                activeScooter?.name ?? 
+                    FlutterI18n.translate(context, "stats_no_name"),
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
         ),
         
-        const SizedBox(width: 8),
+        const SizedBox(height: 8),
         
-        // Settings button
-        IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () => _navigateToSettings(context),
-          tooltip: FlutterI18n.translate(context, 'settings'),
+        // Second row with navigation and status
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Settings button
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => _navigateToSettings(context),
+              tooltip: FlutterI18n.translate(context, 'settings'),
+            ),
+            
+            // Connection status icons
+            const ConnectionStatusIcons(),
+            
+            // Info button
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              onPressed: () => _navigateToStats(context),
+              tooltip: FlutterI18n.translate(context, 'info'),
+            ),
+          ],
         ),
       ],
     );
@@ -229,22 +239,47 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool connected = manager.connected;
     final scooterState = activeScooter?.state;
     
-    // If no scooters are added yet, show a big "Add Scooter" button
-    if (activeScooter == null) {
-      return ElevatedButton.icon(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (context) => const AddScooterScreen()),
-        ),
-        icon: const Icon(Icons.add),
-        label: Text(
-          FlutterI18n.translate(context, "settings_add_scooter"),
-          style: const TextStyle(fontSize: 16),
-        ),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        ),
-      );
-    }
+      // If no scooters are added yet, show a big "Add Scooter" button
+      if (activeScooter == null) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Disconnected scooter silhouette
+            Image.asset(
+              "images/scooter/disconnected.webp",
+              height: 120,
+              opacity: const AlwaysStoppedAnimation(0.7),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Add scooter button
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const AddScooterScreen()),
+              ),
+              icon: const Icon(Icons.add),
+              label: Text(
+                FlutterI18n.translate(context, "settings_add_scooter"),
+                style: const TextStyle(fontSize: 16),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            Text(
+              FlutterI18n.translate(context, "add_scooter_description"),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
+        );
+      }
     
     // Regular action buttons for connected scooters
     return Row(

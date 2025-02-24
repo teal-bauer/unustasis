@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
 import 'package:provider/provider.dart';
 
-import '../domain/format_utils.dart';
 import '../domain/scooter_state.dart';
 import '../models/scooter.dart';
 import '../models/scooter_manager.dart';
@@ -228,11 +227,23 @@ class ScooterCard extends StatelessWidget {
     if (scooter.bleConnected) {
       statusText = scooter.state?.name(context) ?? FlutterI18n.translate(context, 'state_name_unknown');
     } else if (scooter.lastPing != null) {
+      final now = DateTime.now();
+      final difference = now.difference(scooter.lastPing!);
+      
+      String timeAgo;
+      if (difference.inMinutes < 60) {
+        timeAgo = '${difference.inMinutes}m';
+      } else if (difference.inHours < 24) {
+        timeAgo = '${difference.inHours}h';
+      } else {
+        timeAgo = '${difference.inDays}d';
+      }
+      
       statusText = FlutterI18n.translate(
         context,
         'stats_last_ping',
         translationParams: {
-          'time': FormatUtils.formatTimeAgo(scooter.lastPing!, context),
+          'time': timeAgo,
         },
       );
     } else {

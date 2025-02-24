@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
 import 'package:provider/provider.dart';
 
-import '../widgets/scooter_action_button.dart';
-import 'home_screen.dart';
-import '../scooter_service.dart';
 import '../command_service.dart';
+import '../models/scooter_manager.dart';
+import '../widgets/scooter_action_button.dart';
 
 class ControlScreen extends StatefulWidget {
   const ControlScreen({super.key});
@@ -19,10 +18,8 @@ class _ControlScreenState extends State<ControlScreen> {
     return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text(
-                FlutterI18n.translate(context, "cloud_command_confirm_title")),
-            content: Text(
-                FlutterI18n.translate(context, "cloud_command_confirm_body")),
+            title: Text(FlutterI18n.translate(context, "cloud_command_confirm_title")),
+            content: Text(FlutterI18n.translate(context, "cloud_command_confirm_body")),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -57,10 +54,9 @@ class _ControlScreenState extends State<ControlScreen> {
                 Expanded(
                   child: ScooterActionButton(
                     onPressed: () async {
-                      await context.read<ScooterService>().executeCommand(
+                      await context.read<ScooterManager>().executeCommand(
                             CommandType.unlock,
-                            onNeedConfirmation: () =>
-                                showCloudConfirmationDialog(context),
+                            onNeedConfirmation: () => showCloudConfirmationDialog(context),
                           );
                       Navigator.of(context).pop();
                     },
@@ -71,10 +67,9 @@ class _ControlScreenState extends State<ControlScreen> {
                 Expanded(
                   child: ScooterActionButton(
                     onPressed: () async {
-                      await context.read<ScooterService>().executeCommand(
+                      await context.read<ScooterManager>().executeCommand(
                             CommandType.lock,
-                            onNeedConfirmation: () =>
-                                showCloudConfirmationDialog(context),
+                            onNeedConfirmation: () => showCloudConfirmationDialog(context),
                           );
                       Navigator.of(context).pop();
                     },
@@ -93,7 +88,7 @@ class _ControlScreenState extends State<ControlScreen> {
                 Expanded(
                   child: ScooterActionButton(
                     onPressed: () {
-                      context.read<ScooterService>().wakeUp();
+                      context.read<ScooterManager>().executeCommand(CommandType.wakeUp);
                       Navigator.of(context).pop();
                     },
                     icon: Icons.wb_sunny_outlined,
@@ -103,7 +98,7 @@ class _ControlScreenState extends State<ControlScreen> {
                 Expanded(
                   child: ScooterActionButton(
                     onPressed: () {
-                      context.read<ScooterService>().hibernate();
+                      context.read<ScooterManager>().executeCommand(CommandType.hibernate);
                       Navigator.of(context).pop();
                     },
                     icon: Icons.nightlight_outlined,
@@ -122,29 +117,25 @@ class _ControlScreenState extends State<ControlScreen> {
                 Expanded(
                   child: ScooterActionButton(
                     onPressed: () async {
-                      await context.read<ScooterService>().executeCommand(
+                      await context.read<ScooterManager>().executeCommand(
                             CommandType.blinkerLeft,
-                            onNeedConfirmation: () =>
-                                showCloudConfirmationDialog(context),
+                            onNeedConfirmation: () => showCloudConfirmationDialog(context),
                           );
                     },
                     icon: Icons.arrow_back_ios_new_rounded,
-                    label:
-                        FlutterI18n.translate(context, "controls_blink_left"),
+                    label: FlutterI18n.translate(context, "controls_blink_left"),
                   ),
                 ),
                 Expanded(
                   child: ScooterActionButton(
                     onPressed: () async {
-                      await context.read<ScooterService>().executeCommand(
+                      await context.read<ScooterManager>().executeCommand(
                             CommandType.blinkerRight,
-                            onNeedConfirmation: () =>
-                                showCloudConfirmationDialog(context),
+                            onNeedConfirmation: () => showCloudConfirmationDialog(context),
                           );
                     },
                     icon: Icons.arrow_forward_ios_rounded,
-                    label:
-                        FlutterI18n.translate(context, "controls_blink_right"),
+                    label: FlutterI18n.translate(context, "controls_blink_right"),
                   ),
                 ),
               ],
@@ -152,41 +143,35 @@ class _ControlScreenState extends State<ControlScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Expanded(
-                    child: ScooterActionButton(
-                      onPressed: () async {
-                        await context.read<ScooterService>().executeCommand(
-                              CommandType.blinkerBoth,
-                              onNeedConfirmation: () =>
-                                  showCloudConfirmationDialog(context),
-                            );
-                      },
-                      icon: Icons.code_rounded,
-                      label: FlutterI18n.translate(
-                          context, "controls_blink_hazard"),
-                    ),
-                  ),
-                  Expanded(
-                    child: ScooterActionButton(
-                      onPressed: () async {
-                        await context.read<ScooterService>().executeCommand(
-                              CommandType.blinkerOff,
-                              onNeedConfirmation: () =>
-                                  showCloudConfirmationDialog(context),
-                            );
-                      },
-                      icon: Icons.code_off_rounded,
-                      label:
-                          FlutterI18n.translate(context, "controls_blink_off"),
-                    ),
-                  ),
-                ]),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+              Expanded(
+                child: ScooterActionButton(
+                  onPressed: () async {
+                    await context.read<ScooterManager>().executeCommand(
+                          CommandType.blinkerBoth,
+                          onNeedConfirmation: () => showCloudConfirmationDialog(context),
+                        );
+                  },
+                  icon: Icons.code_rounded,
+                  label: FlutterI18n.translate(context, "controls_blink_hazard"),
+                ),
+              ),
+              Expanded(
+                child: ScooterActionButton(
+                  onPressed: () async {
+                    await context.read<ScooterManager>().executeCommand(
+                          CommandType.blinkerOff,
+                          onNeedConfirmation: () => showCloudConfirmationDialog(context),
+                        );
+                  },
+                  icon: Icons.code_off_rounded,
+                  label: FlutterI18n.translate(context, "controls_blink_off"),
+                ),
+              ),
+            ]),
           ),
           FutureBuilder<bool>(
-            future: context.read<ScooterService>().isCommandAvailable(CommandType.honk),
+            future: context.read<ScooterManager>().isCommandAvailable(CommandType.honk),
             builder: (context, snapshot) {
               if (!snapshot.hasData || !snapshot.data!) {
                 return Container(); // Don't show cloud section if not available
@@ -203,10 +188,10 @@ class _ControlScreenState extends State<ControlScreen> {
                         Expanded(
                           child: ScooterActionButton(
                             onPressed: () async {
-                              await context.read<ScooterService>().executeCommand(
-                                CommandType.honk,
-                                onNeedConfirmation: () => showCloudConfirmationDialog(context),
-                              );
+                              await context.read<ScooterManager>().executeCommand(
+                                    CommandType.honk,
+                                    onNeedConfirmation: () => showCloudConfirmationDialog(context),
+                                  );
                             },
                             icon: Icons.volume_up_outlined,
                             label: FlutterI18n.translate(context, "controls_honk"),
@@ -215,10 +200,10 @@ class _ControlScreenState extends State<ControlScreen> {
                         Expanded(
                           child: ScooterActionButton(
                             onPressed: () async {
-                              await context.read<ScooterService>().executeCommand(
-                                CommandType.locate,
-                                onNeedConfirmation: () => showCloudConfirmationDialog(context),
-                              );
+                              await context.read<ScooterManager>().executeCommand(
+                                    CommandType.locate,
+                                    onNeedConfirmation: () => showCloudConfirmationDialog(context),
+                                  );
                             },
                             icon: Icons.search_outlined,
                             label: FlutterI18n.translate(context, "controls_locate"),
@@ -235,10 +220,10 @@ class _ControlScreenState extends State<ControlScreen> {
                         Expanded(
                           child: ScooterActionButton(
                             onPressed: () async {
-                              await context.read<ScooterService>().executeCommand(
-                                CommandType.alarm,
-                                onNeedConfirmation: () => showCloudConfirmationDialog(context),
-                              );
+                              await context.read<ScooterManager>().executeCommand(
+                                    CommandType.alarm,
+                                    onNeedConfirmation: () => showCloudConfirmationDialog(context),
+                                  );
                             },
                             icon: Icons.notification_important_outlined,
                             label: FlutterI18n.translate(context, "controls_alarm"),
@@ -247,10 +232,10 @@ class _ControlScreenState extends State<ControlScreen> {
                         Expanded(
                           child: ScooterActionButton(
                             onPressed: () async {
-                              await context.read<ScooterService>().executeCommand(
-                                CommandType.ping,
-                                onNeedConfirmation: () => showCloudConfirmationDialog(context),
-                              );
+                              await context.read<ScooterManager>().executeCommand(
+                                    CommandType.ping,
+                                    onNeedConfirmation: () => showCloudConfirmationDialog(context),
+                                  );
                             },
                             icon: Icons.cloud_sync_outlined,
                             label: FlutterI18n.translate(context, "controls_ping"),
@@ -259,10 +244,10 @@ class _ControlScreenState extends State<ControlScreen> {
                         Expanded(
                           child: ScooterActionButton(
                             onPressed: () async {
-                              await context.read<ScooterService>().executeCommand(
-                                CommandType.getState,
-                                onNeedConfirmation: () => showCloudConfirmationDialog(context),
-                              );
+                              await context.read<ScooterManager>().executeCommand(
+                                    CommandType.getState,
+                                    onNeedConfirmation: () => showCloudConfirmationDialog(context),
+                                  );
                             },
                             icon: Icons.refresh_outlined,
                             label: FlutterI18n.translate(context, "controls_refresh"),
@@ -293,11 +278,10 @@ class Header extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
           child: Text(title,
-              style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.7))),
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall!
+                  .copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))),
         ),
       ],
     );

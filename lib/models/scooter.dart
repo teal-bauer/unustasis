@@ -383,3 +383,9 @@ class Scooter with ChangeNotifier {
     return primaryRange + secondaryRange;
   }
 }
+
+class SeatOpenException {}
+
+class UnavailableCharacteristicsException {}
+
+class HandlebarLockException {}

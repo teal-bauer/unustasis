@@ -14,8 +14,7 @@ import '../cloud_service.dart';
 import '../command_service.dart';
 import '../domain/scooter_state.dart';
 import '../flutter/blue_plus_mockable.dart';
-import '../infrastructure/characteristic_repository.dart';
-import '../infrastructure/scooter_reader.dart';
+import '../services/ble_connection_service.dart';
 import 'scooter.dart';
 
 typedef ConfirmationCallback = Future<bool> Function();
@@ -24,21 +23,20 @@ class ScooterManager with ChangeNotifier {
   final log = Logger('ScooterManager');
 
   // Dependencies
-  final FlutterBluePlusMockable _flutterBluePlus;
+  late final FlutterBluePlusMockable _flutterBluePlus;
   late CloudService _cloudService;
 
   // State
   Map<String, Scooter> _scooters = {};
   String? _activeScooterId;
 
-  // BLE connection state
-  bool _scanning = false;
-  bool _bleAutoRestarting = false;
-  BluetoothDevice? _activeDevice;
-  CharacteristicRepository? _characteristicRepository;
-  ScooterReader? _scooterReader;
-  BLECommandService? _bleCommands;
+  // Connection services
+  late BLEConnectionService _bleConnectionService;
   late CloudCommandService _cloudCommands;
+  BLECommandService? _bleCommands;
+  
+  // Connection state
+  bool _scanning = false;
 
   // Settings
   bool _autoUnlock = false;
@@ -53,8 +51,8 @@ class ScooterManager with ChangeNotifier {
   String? get activeScooterId => _activeScooterId;
   Scooter? get activeScooter => _activeScooterId != null ? _scooters[_activeScooterId] : null;
   bool get scanning => _scanning;
-  bool get connected => _activeDevice?.isConnected ?? false;
-  BluetoothDevice? get activeDevice => _activeDevice;
+  bool get connected => _bleConnectionService.isConnected;
+  BluetoothDevice? get activeDevice => _bleConnectionService.device;
   bool get autoUnlock => _autoUnlock;
   int get autoUnlockThreshold => _autoUnlockThreshold;
   bool get openSeatOnUnlock => _openSeatOnUnlock;
@@ -63,6 +61,14 @@ class ScooterManager with ChangeNotifier {
 
   // Constructor
   ScooterManager(this._flutterBluePlus, {bool isInBackgroundService = false}) {
+    // Initialize BLE connection service with callbacks
+    _bleConnectionService = BLEConnectionService(
+      _flutterBluePlus,
+      onStateUpdate: updateBleState,
+      onBatteryUpdate: updateBatteryInfo,
+      onRssiUpdate: updateRssi,
+    );
+    
     _initialize();
   }
 
@@ -70,7 +76,7 @@ class ScooterManager with ChangeNotifier {
   Future<void> _initialize() async {
     // Set up cloud service
     _cloudService = CloudService(this);
-    _cloudCommands = CloudCommandService(_cloudService, () => activeScooter?.cloudScooterId);
+    _cloudCommands = CloudCommandService(_cloudService, this);
 
     // Load saved settings
     await _loadSettings();
@@ -78,7 +84,7 @@ class ScooterManager with ChangeNotifier {
     // Load saved scooters
     await _loadScooters();
 
-    // Update scanning status based on FlutterBluePlus
+    // Update scanning status
     _flutterBluePlus.isScanning.listen((isScanning) {
       _scanning = isScanning;
       notifyListeners();
@@ -243,11 +249,8 @@ class ScooterManager with ChangeNotifier {
   Future<void> setActiveScooter(String scooterId) async {
     if (_scooters.containsKey(scooterId)) {
       // Disconnect from current scooter if needed
-      if (_activeScooterId != null && _activeDevice != null && _activeDevice!.isConnected) {
-        await _activeDevice!.disconnect();
-        _activeDevice = null;
-        _characteristicRepository = null;
-        _scooterReader = null;
+      if (_activeScooterId != null && _bleConnectionService.isConnected) {
+        await _bleConnectionService.disconnect();
         _bleCommands = null;
       }
 
@@ -282,13 +285,10 @@ class ScooterManager with ChangeNotifier {
     if (_scooters.containsKey(scooterId)) {
       // If it's the active scooter, disconnect it first
       if (_activeScooterId == scooterId) {
-        if (_activeDevice != null && _activeDevice!.isConnected) {
-          await _activeDevice!.disconnect();
+        if (_bleConnectionService.isConnected) {
+          await _bleConnectionService.disconnect();
         }
 
-        _activeDevice = null;
-        _characteristicRepository = null;
-        _scooterReader = null;
         _bleCommands = null;
         _activeScooterId = null;
 
@@ -326,14 +326,16 @@ class ScooterManager with ChangeNotifier {
     }
 
     try {
-      // Create BluetoothDevice from ID
-      BluetoothDevice device = BluetoothDevice.fromId(_activeScooterId!);
-
-      // Attempt to connect to the device
-      await device.connect(timeout: const Duration(seconds: 15));
-
-      // Set up characteristics and commands
-      await _setupConnection(device);
+      // Connect to the device using BLEConnectionService
+      await _bleConnectionService.connect(_activeScooterId!);
+      
+      // Set up BLE commands
+      if (_bleConnectionService.characteristicRepository != null) {
+        _bleCommands = BLECommandService(
+          _bleConnectionService.device!, 
+          _bleConnectionService.characteristicRepository
+        );
+      }
 
       // Update the scooter's status
       _scooters[_activeScooterId!]?.updateBleConnection(
@@ -348,65 +350,16 @@ class ScooterManager with ChangeNotifier {
     }
   }
 
-  Future<void> _setupConnection(BluetoothDevice device) async {
-    _activeDevice = device;
-
-    try {
-      _characteristicRepository = CharacteristicRepository(device);
-      await _characteristicRepository!.findAll();
-
-      _bleCommands = BLECommandService(device, _characteristicRepository);
-
-      _scooterReader = ScooterReader(service: this, characteristicRepository: _characteristicRepository!);
-
-      _scooterReader!.readAndSubscribe();
-
-      // Set up disconnection listener
-      device.connectionState.listen((BluetoothConnectionState state) {
-        if (state == BluetoothConnectionState.disconnected) {
-          if (_activeScooterId != null) {
-            _scooters[_activeScooterId!]?.updateBleConnection(
-              connected: false,
-              state: ScooterState.disconnected,
-            );
-          }
-          notifyListeners();
-
-          // Try to reconnect if auto-restart is enabled
-          if (_bleAutoRestarting) {
-            attemptToConnectToActiveScooter();
-          }
-        }
-      });
-    } catch (e, stack) {
-      log.severe("Error setting up BLE connection", e, stack);
-      throw Exception("Failed to set up BLE connection: ${e.toString()}");
-    }
-  }
-
   // Start scanning for scooters
   Future<void> _startScan() async {
-    if (_flutterBluePlus.isScanningNow) {
-      return;
-    }
-
     // Get list of scooter IDs we have, for quicker reconnection
     List<String> scooterIds = _scooters.keys.toList();
-
+    
     try {
-      if (scooterIds.isNotEmpty) {
-        // First try to scan for known scooters
-        _flutterBluePlus.startScan(
-          withRemoteIds: scooterIds,
-          timeout: const Duration(seconds: 30),
-        );
-      } else {
-        // If no known scooters, scan for all unu scooters
-        _flutterBluePlus.startScan(
-          withNames: ["unu Scooter"],
-          timeout: const Duration(seconds: 30),
-        );
-      }
+      await _bleConnectionService.scan(
+        savedIds: scooterIds.isNotEmpty ? scooterIds : null,
+        preferSavedIds: scooterIds.isNotEmpty,
+      );
     } catch (e, stack) {
       log.severe("Failed to start BLE scan", e, stack);
     }
@@ -417,68 +370,20 @@ class ScooterManager with ChangeNotifier {
     List<String> excludeIds = const [],
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    if (_flutterBluePlus.isScanningNow) {
-      _flutterBluePlus.stopScan();
-    }
-
-    final List<BluetoothDevice> foundDevices = [];
-    final Completer<List<BluetoothDevice>> completer = Completer();
-
-    try {
-      // Start scanning for unu scooters
-      _flutterBluePlus.startScan(
-        withNames: ["unu Scooter"],
-        timeout: timeout,
-      );
-
-      // Listen for scan results
-      final subscription = _flutterBluePlus.scanResults.listen((results) {
-        for (ScanResult result in results) {
-          // Skip devices that are in the exclude list
-          if (excludeIds.contains(result.device.remoteId.toString())) {
-            continue;
-          }
-
-          // Skip devices that are already in our list
-          if (foundDevices.any((device) => device.remoteId.toString() == result.device.remoteId.toString())) {
-            continue;
-          }
-
-          foundDevices.add(result.device);
-        }
-      });
-
-      // Complete when scan finishes
-      _flutterBluePlus.isScanning.where((isScanning) => !isScanning).first.then((_) {
-        subscription.cancel();
-        completer.complete(foundDevices);
-      });
-
-      // Handle timeout
-      Future.delayed(timeout + const Duration(seconds: 1), () {
-        if (!completer.isCompleted) {
-          subscription.cancel();
-          _flutterBluePlus.stopScan();
-          completer.complete(foundDevices);
-        }
-      });
-    } catch (e, stack) {
-      log.severe("Error scanning for new scooters", e, stack);
-      _flutterBluePlus.stopScan();
-      completer.completeError(e, stack);
-    }
-
-    return completer.future;
+    return _bleConnectionService.scan(
+      excludeIds: excludeIds,
+      preferSavedIds: false,
+    );
   }
 
   // Start auto-reconnection
   void startAutoReconnect() {
-    _bleAutoRestarting = true;
+    _bleConnectionService.startAutoReconnect();
   }
 
   // Stop auto-reconnection
   void stopAutoReconnect() {
-    _bleAutoRestarting = false;
+    _bleConnectionService.stopAutoReconnect();
   }
 
   // Command execution

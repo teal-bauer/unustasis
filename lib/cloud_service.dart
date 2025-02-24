@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
 import 'scooter_service.dart';
@@ -100,8 +101,7 @@ class CloudService {
     return assignments;
   }
 
-  Future<void> assignScooter(
-      {required String bleId, required int cloudId}) async {
+  Future<void> assignScooter({required String bleId, required int cloudId}) async {
     // Get the saved scooter object
     final savedScooter = scooterService.savedScooters[bleId];
     if (savedScooter == null) {
@@ -117,15 +117,13 @@ class CloudService {
     // Update local scooter if it has default values
     if (savedScooter.name == "Scooter Pro" && savedScooter.color == 1) {
       savedScooter.color = cloudScooter['color_id'] ?? 1;
-      scooterService.renameSavedScooter(
-          id: savedScooter.id, name: cloudScooter['name']);
+      scooterService.renameSavedScooter(id: savedScooter.id, name: cloudScooter['name']);
     }
 
     // Get any existing assignment for this cloud scooter
     final assignments = await getCurrentAssignments();
-    final existingAssignment = assignments.entries.firstWhere(
-        (entry) => entry.value == cloudId,
-        orElse: () => MapEntry('', -1));
+    final existingAssignment =
+        assignments.entries.firstWhere((entry) => entry.value == cloudId, orElse: () => MapEntry('', -1));
 
     if (existingAssignment.key.isNotEmpty) {
       // Remove the old assignment
@@ -135,10 +133,8 @@ class CloudService {
     // Format device ID appropriately
     final deviceId = Platform.isAndroid
         ? bleId.toLowerCase().replaceAllMapped(
-            RegExp(
-                r'([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})'),
-            (match) =>
-                '${match[1]}:${match[2]}:${match[3]}:${match[4]}:${match[5]}:${match[6]}')
+            RegExp(r'([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})'),
+            (match) => '${match[1]}:${match[2]}:${match[3]}:${match[4]}:${match[5]}:${match[6]}')
         : bleId;
 
     // Update API and local data
@@ -263,25 +259,19 @@ class CloudService {
       }
     } else {
       final body = response.body;
-      log.warning(
-          'API request failed with status ${response.statusCode}: $body');
+      log.warning('API request failed with status ${response.statusCode}: $body');
       throw Exception('API request failed (${response.statusCode}): $body');
     }
   }
 
   Future<bool> _executeCommand(String endpoint, int scooterId,
-      {String method = 'POST',
-      Map<String, dynamic>? body,
-      String? logName // Optional custom name for logging
+      {String method = 'POST', Map<String, dynamic>? body, String? logName // Optional custom name for logging
       }) async {
     final commandName = logName ?? endpoint.replaceAll('/', ' ').trim();
     log.info("Attempting $commandName for scooter $scooterId");
 
     try {
-      final response = await _authenticatedRequest(
-          '/scooters/$scooterId/$endpoint',
-          method: method,
-          body: body);
+      final response = await _authenticatedRequest('/scooters/$scooterId/$endpoint', method: method, body: body);
       return response != null;
     } catch (e, stack) {
       log.severe('$commandName failed', e, stack);
@@ -303,8 +293,7 @@ class CloudService {
 
   Future<bool> blinkers(int scooterId, String state) async {
     log.info(["blinkers", scooterId, state]);
-    return _executeCommand('blinkers', scooterId,
-        body: {'state': state}, logName: 'blinkers $state');
+    return _executeCommand('blinkers', scooterId, body: {'state': state}, logName: 'blinkers $state');
   }
 
   Future<bool> honk(int scooterId) async {

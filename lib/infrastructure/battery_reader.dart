@@ -1,19 +1,17 @@
-import 'dart:async';
-
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:logging/logging.dart';
 
-import '../scooter_service.dart';
 import '../domain/scooter_battery.dart';
 import '../infrastructure/string_reader.dart';
 import '../infrastructure/utils.dart';
+import '../models/scooter_manager.dart';
 
 class BatteryReader {
   final log = Logger("BatteryReader");
   final ScooterBattery _battery;
-  final ScooterService _service;
+  final ScooterManager _manager;
 
-  BatteryReader(this._battery, this._service);
+  BatteryReader(this._battery, this._manager);
 
   void readAndSubscribeSOC(
     BluetoothCharacteristic socCharacteristic,
@@ -26,20 +24,23 @@ class BatteryReader {
         soc = _convertUint32ToInt(value);
       }
       log.info("$_battery SOC received: $soc");
+      
       // sometimes the scooter sends null. Ignoring those values...
       if (soc != null) {
         switch (_battery) {
           case ScooterBattery.primary:
-            _service.primarySOC = soc;
+            _manager.updateBatteryInfo(primarySOC: soc);
+            break;
           case ScooterBattery.secondary:
-            _service.secondarySOC = soc;
+            _manager.updateBatteryInfo(secondarySOC: soc);
+            break;
           case ScooterBattery.cbb:
-            _service.cbbSOC = soc;
+            _manager.updateBatteryInfo(cbbSOC: soc);
+            break;
           case ScooterBattery.aux:
-            _service.auxSOC = soc;
+            _manager.updateBatteryInfo(auxSOC: soc);
+            break;
         }
-        _writeSocToCache(soc);
-        _service.ping();
       }
     });
   }
@@ -50,16 +51,20 @@ class BatteryReader {
     subscribeCharacteristic(cyclesCharacteristic, (value) {
       int? cycles = _convertUint32ToInt(value);
       log.info("$_battery battery cycles received: $cycles");
-      switch (_battery) {
-        case ScooterBattery.primary:
-          _service.primaryCycles = cycles;
-        case ScooterBattery.secondary:
-          _service.secondaryCycles = cycles;
-        default:
-          // we will never read cycles of CBB or AUX, so this is unreachable
-          break;
+      
+      if (cycles != null) {
+        switch (_battery) {
+          case ScooterBattery.primary:
+            _manager.updateBatteryInfo(primaryCycles: cycles);
+            break;
+          case ScooterBattery.secondary:
+            _manager.updateBatteryInfo(secondaryCycles: cycles);
+            break;
+          default:
+            // we will never read cycles of CBB or AUX, so this is unreachable
+            break;
+        }
       }
-      _service.ping();
     });
   }
 
@@ -71,40 +76,23 @@ class BatteryReader {
       if (chargingState == "charging") {
         switch (_battery) {
           case ScooterBattery.cbb:
-            _service.cbbCharging = true;
+            _manager.updateBatteryInfo(cbbCharging: true);
+            break;
           default:
             // CBB is the only one that reports charging, so this is unreachable
             break;
         }
-        _service.ping();
       } else if (chargingState == "not-charging") {
         switch (_battery) {
           case ScooterBattery.cbb:
-            _service.cbbCharging = false;
+            _manager.updateBatteryInfo(cbbCharging: false);
+            break;
           default:
             // CBB is the only one that reports charging, so this is unreachable
             break;
         }
-        _service.ping();
       }
     });
-  }
-
-  Future<void> _writeSocToCache(int soc) async {
-    switch (_battery) {
-      case ScooterBattery.primary:
-        _service.savedScooters[_service.myScooter!.remoteId.toString()]!
-            .lastPrimarySOC = soc;
-      case ScooterBattery.secondary:
-        _service.savedScooters[_service.myScooter!.remoteId.toString()]!
-            .lastSecondarySOC = soc;
-      case ScooterBattery.cbb:
-        _service.savedScooters[_service.myScooter!.remoteId.toString()]!
-            .lastCbbSOC = soc;
-      case ScooterBattery.aux:
-        _service.savedScooters[_service.myScooter!.remoteId.toString()]!
-            .lastAuxSOC = soc;
-    }
   }
 
   int? _convertUint32ToInt(List<int> uint32data) {

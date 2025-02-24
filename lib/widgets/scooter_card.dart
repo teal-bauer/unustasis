@@ -13,7 +13,7 @@ class ScooterCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onSettings;
   final bool showConnect;
-  
+
   const ScooterCard({
     super.key,
     required this.scooter,
@@ -29,10 +29,12 @@ class ScooterCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isActive ? BorderSide(
-          color: Theme.of(context).colorScheme.primary,
-          width: 2,
-        ) : BorderSide.none,
+        side: isActive
+            ? BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 2,
+              )
+            : BorderSide.none,
       ),
       elevation: isActive ? 3 : 1,
       child: InkWell(
@@ -50,8 +52,8 @@ class ScooterCard extends StatelessWidget {
                     child: Text(
                       scooter.name,
                       style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                   ),
                   _buildConnectionIcons(context),
@@ -64,9 +66,9 @@ class ScooterCard extends StatelessWidget {
                     ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Scooter details
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,28 +81,26 @@ class ScooterCard extends StatelessWidget {
                       fit: BoxFit.contain,
                     ),
                   ),
-                  
+
                   const SizedBox(width: 12),
-                  
+
                   // Scooter details
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Battery info
-                        if (scooter.primarySOC != null)
-                          _buildBatteryInfo(context),
-                          
+                        if (scooter.primarySOC != null) _buildBatteryInfo(context),
+
                         const SizedBox(height: 8),
-                        
+
                         // Connection status
                         _buildStatusInfo(context),
-                        
+
                         const SizedBox(height: 8),
-                        
+
                         // Connect button if not active
-                        if (showConnect && !isActive)
-                          _buildConnectButton(context),
+                        if (showConnect && !isActive) _buildConnectButton(context),
                       ],
                     ),
                   ),
@@ -112,7 +112,7 @@ class ScooterCard extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildConnectionIcons(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -127,8 +127,7 @@ class ScooterCard extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary,
             ),
           )
-        else if (scooter.sourceType == ScooterSourceType.ble || 
-                 scooter.sourceType == ScooterSourceType.both)
+        else if (scooter.sourceType == ScooterSourceType.ble || scooter.sourceType == ScooterSourceType.both)
           Tooltip(
             message: FlutterI18n.translate(context, 'disconnected_bluetooth'),
             child: Icon(
@@ -137,9 +136,9 @@ class ScooterCard extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
             ),
           ),
-          
+
         const SizedBox(width: 8),
-        
+
         // Cloud connection icon
         if (scooter.cloudConnected)
           Tooltip(
@@ -162,11 +161,11 @@ class ScooterCard extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildBatteryInfo(BuildContext context) {
     int primarySOC = scooter.primarySOC ?? 0;
     int secondarySOC = scooter.secondarySOC ?? 0;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -184,12 +183,9 @@ class ScooterCard extends StatelessWidget {
                 minHeight: 8,
                 borderRadius: BorderRadius.circular(4),
                 backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-                color: primarySOC <= 15 ? 
-                  Theme.of(context).colorScheme.error : 
-                  Theme.of(context).colorScheme.primary,
+                color: primarySOC <= 15 ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
               ),
             ),
-            
             if (secondarySOC > 0) ...[
               const SizedBox(width: 4),
               Expanded(
@@ -199,9 +195,8 @@ class ScooterCard extends StatelessWidget {
                   minHeight: 8,
                   borderRadius: BorderRadius.circular(4),
                   backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-                  color: secondarySOC <= 15 ? 
-                    Theme.of(context).colorScheme.error : 
-                    Theme.of(context).colorScheme.primary,
+                  color:
+                      secondarySOC <= 15 ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
                 ),
               ),
             ],
@@ -226,16 +221,15 @@ class ScooterCard extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildStatusInfo(BuildContext context) {
     String? statusText;
-    
+
     if (scooter.bleConnected) {
-      statusText = scooter.state?.name(context) ?? 
-        FlutterI18n.translate(context, 'state_name_unknown');
+      statusText = scooter.state?.name(context) ?? FlutterI18n.translate(context, 'state_name_unknown');
     } else if (scooter.lastPing != null) {
       statusText = FlutterI18n.translate(
-        context, 
+        context,
         'stats_last_ping',
         translationParams: {
           'time': FormatUtils.formatTimeAgo(scooter.lastPing!, context),
@@ -244,13 +238,13 @@ class ScooterCard extends StatelessWidget {
     } else {
       statusText = FlutterI18n.translate(context, 'state_name_disconnected');
     }
-    
+
     return Text(
       statusText,
       style: Theme.of(context).textTheme.bodySmall,
     );
   }
-  
+
   Widget _buildConnectButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,

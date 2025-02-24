@@ -13,16 +13,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/log_helper.dart';
 import '../flutter/blue_plus_mockable.dart';
-import '../home_screen.dart';
-import '../scooter_service.dart';
 import 'background/bg_service.dart';
+import 'scooter_service.dart';
+import 'screens/home_screen.dart';
 
 void main() async {
   LogHelper().initialize();
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-  SystemChrome.setPreferredOrientations(
-      [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
   Locale? savedLocale;
 
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -41,21 +40,21 @@ void main() async {
   runApp(ChangeNotifierProvider(
       create: (context) => ScooterService(FlutterBluePlusMockable()),
       child: EasyDynamicThemeWidget(
-        child: MyApp(
+        child: UnustasisApp(
           savedLocale: savedLocale,
         ),
       )));
 }
 
-class MyApp extends StatefulWidget {
+class UnustasisApp extends StatefulWidget {
   final Locale? savedLocale;
-  const MyApp({this.savedLocale, super.key});
+  const UnustasisApp({this.savedLocale, super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  State<UnustasisApp> createState() => _UnustasisAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _UnustasisAppState extends State<UnustasisApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -64,8 +63,7 @@ class _MyAppState extends State<MyApp> {
         appBarTheme: const AppBarTheme(
           centerTitle: true,
         ),
-        textTheme: GoogleFonts.nunitoTextTheme(
-            ThemeData(brightness: Brightness.light).textTheme),
+        textTheme: GoogleFonts.nunitoTextTheme(ThemeData(brightness: Brightness.light).textTheme),
         brightness: Brightness.light,
         useMaterial3: true,
         colorScheme: ColorScheme.light(
@@ -86,8 +84,7 @@ class _MyAppState extends State<MyApp> {
         appBarTheme: const AppBarTheme(
           centerTitle: true,
         ),
-        textTheme: GoogleFonts.nunitoTextTheme(
-            ThemeData(brightness: Brightness.dark).textTheme),
+        textTheme: GoogleFonts.nunitoTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
         brightness: Brightness.dark,
         useMaterial3: true,
         colorScheme: ColorScheme.dark(
@@ -114,8 +111,7 @@ class _MyAppState extends State<MyApp> {
             forcedLocale: widget.savedLocale,
           ),
           missingTranslationHandler: (key, locale) {
-            Logger("Main").warning(
-                "--- Missing Key: $key, languageCode: ${locale?.languageCode}");
+            Logger("Main").warning("--- Missing Key: $key, languageCode: ${locale?.languageCode}");
           },
         ),
       ],

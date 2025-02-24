@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
 import 'package:provider/provider.dart';
 
-import '../home_screen.dart';
+import '../widgets/scooter_action_button.dart';
+import 'home_screen.dart';
 import '../scooter_service.dart';
-import 'command_service.dart';
+import '../command_service.dart';
 
 class ControlScreen extends StatefulWidget {
   const ControlScreen({super.key});

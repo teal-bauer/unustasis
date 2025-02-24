@@ -15,6 +15,7 @@ import '../domain/theme_helper.dart';
 import '../helper_widgets/snowfall.dart';
 import '../models/scooter.dart';
 import '../models/scooter_manager.dart';
+import '../scooter_service.dart';
 import '../widgets/battery_bars.dart';
 import '../widgets/scooter_action_button.dart';
 import '../widgets/scooter_power_button.dart';
@@ -33,8 +34,8 @@ class HomeScreen extends StatefulWidget {
   
   const HomeScreen({
     this.forceOpen,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -115,8 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 SnowfallBackground(
                   backgroundColor: Colors.transparent,
                   snowflakeColor: context.isDarkMode
-                      ? Colors.white.withOpacity(0.15)
-                      : Colors.black.withOpacity(0.05),
+                      ? Colors.white.withValues(alpha: .15)
+                      : Colors.black.withValues(alpha: .05),
                 ),
               
               // Main content
@@ -560,11 +561,11 @@ class StateCircle extends StatelessWidget {
   final ScooterState? scooterState;
 
   const StateCircle({
-    Key? key,
+    super.key,
     required this.scanning,
     required this.connected,
     required this.scooterState,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -596,7 +597,7 @@ class StateCircle extends StatelessWidget {
               : Theme.of(context)
                   .colorScheme
                   .surfaceContainer
-                  .withOpacity(context.isDarkMode ? 0.5 : 0.7),
+                  .withValues(alpha: context.isDarkMode ? 0.5 : 0.7),
         ),
       ),
     );

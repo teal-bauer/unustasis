@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:appcheck/appcheck.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,14 +10,13 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:logging/logging.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
-import 'package:appcheck/appcheck.dart';
 
-import '../domain/theme_helper.dart';
-import '../home_screen.dart';
-import '../scooter_service.dart';
 import '../domain/scooter_state.dart';
+import '../domain/theme_helper.dart';
+import '../scooter_service.dart';
 import '../scooter_visual.dart';
-import '../support_screen.dart';
+import 'home_screen.dart';
+import 'support_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({

@@ -5,24 +5,24 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
-import 'scooter_service.dart';
+import 'models/scooter_manager.dart';
 
 class CloudService {
   final log = Logger('CloudService');
   final storage = const FlutterSecureStorage();
   final String baseUrl = 'https://sunshine.rescoot.org/api/v1';
-  final ScooterService scooterService;
+  final ScooterManager scooterManager;
   String? _token;
   List<Map<String, dynamic>>? _cachedScooters;
 
   // Singleton pattern
   static CloudService? _instance;
-  factory CloudService(ScooterService scooterService) {
-    _instance ??= CloudService._internal(scooterService);
+  factory CloudService(ScooterManager scooterManager) {
+    _instance ??= CloudService._internal(scooterManager);
     _instance!._initialize();
     return _instance!;
   }
-  CloudService._internal(this.scooterService);
+  CloudService._internal(this.scooterManager);
 
   void _initialize() {
     init();
@@ -89,10 +89,12 @@ class CloudService {
     log.info('Successfully cached ${_cachedScooters!.length} scooters');
   }
 
+// Example from getCurrentAssignments method
   Future<Map<String, int>> getCurrentAssignments() async {
     Map<String, int> assignments = {};
 
-    for (var savedScooter in scooterService.savedScooters.values) {
+    for (var savedScooter in scooterManager.scooters.values) {
+      // Changed from scooterService
       if (savedScooter.cloudScooterId != null) {
         assignments[savedScooter.id] = savedScooter.cloudScooterId!;
       }
@@ -103,7 +105,7 @@ class CloudService {
 
   Future<void> assignScooter({required String bleId, required int cloudId}) async {
     // Get the saved scooter object
-    final savedScooter = scooterService.savedScooters[bleId];
+    final savedScooter = scooterManager.scooters[bleId];
     if (savedScooter == null) {
       throw Exception('Local scooter not found');
     }
@@ -117,7 +119,7 @@ class CloudService {
     // Update local scooter if it has default values
     if (savedScooter.name == "Scooter Pro" && savedScooter.color == 1) {
       savedScooter.color = cloudScooter['color_id'] ?? 1;
-      scooterService.renameSavedScooter(id: savedScooter.id, name: cloudScooter['name']);
+      scooterManager.renameSavedScooter(id: savedScooter.id, name: cloudScooter['name']);
     }
 
     // Get any existing assignment for this cloud scooter
@@ -158,7 +160,8 @@ class CloudService {
   }
 
   Future<void> removeAssignment(String bleId) async {
-    final savedScooter = scooterService.savedScooters[bleId];
+    final savedScooter = scooterManager.scooters[bleId];
+
     if (savedScooter == null) {
       throw Exception('Local scooter not found');
     }

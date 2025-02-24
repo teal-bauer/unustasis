@@ -9,14 +9,14 @@ import '../screens/add_scooter_screen.dart';
 import '../screens/scooter_details_screen.dart';
 
 class ScooterSelectionDialog extends StatelessWidget {
-  const ScooterSelectionDialog({Key? key}) : super(key: key);
+  const ScooterSelectionDialog({super.key});
 
   @override
   Widget build(BuildContext context) {
     final manager = Provider.of<ScooterManager>(context);
     final activeScooterId = manager.activeScooterId;
     final scooters = manager.scooters.values.toList();
-    
+
     // Sort scooters: active first, then by most recently connected
     scooters.sort((a, b) {
       if (a.id == activeScooterId) return -1;
@@ -51,7 +51,7 @@ class ScooterSelectionDialog extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Scooter list
             if (scooters.isEmpty)
               Padding(
@@ -93,7 +93,7 @@ class ScooterSelectionDialog extends StatelessWidget {
                   ),
                 ),
               ),
-            
+
             // Add scooter button
             Padding(
               padding: const EdgeInsets.only(top: 16.0),

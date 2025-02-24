@@ -9,7 +9,7 @@ import '../models/scooter.dart';
 import '../models/scooter_manager.dart';
 
 class StatusText extends StatelessWidget {
-  const StatusText({Key? key}) : super(key: key);
+  const StatusText({super.key});
 
   @override
   Widget build(BuildContext context) {

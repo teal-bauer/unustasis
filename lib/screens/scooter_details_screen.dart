@@ -14,9 +14,9 @@ class ScooterDetailsScreen extends StatefulWidget {
   final Scooter scooter;
   
   const ScooterDetailsScreen({
-    Key? key,
+    super.key,
     required this.scooter,
-  }) : super(key: key);
+  });
 
   @override
   State<ScooterDetailsScreen> createState() => _ScooterDetailsScreenState();

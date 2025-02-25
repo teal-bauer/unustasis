@@ -30,6 +30,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final log = Logger('OnboardingScreen');
   int tapCount = 0;
+  bool _setupStarted = false;
   bool _isScanning = false;
   bool _bluetoothEnabled = true;
   bool _showingCloudLogin = false;
@@ -120,8 +121,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _startSetup() async {
     log.info("Starting setup");
     
+    // Hide the welcome screen and show the setup screen
     setState(() {
-      _isScanning = true;
+      _setupStarted = true;
+      _isScanning = false;
     });
     
     try {
@@ -140,35 +143,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         
         setState(() {
           _bluetoothEnabled = isBluetoothAvailable;
-          if (!isBluetoothAvailable) {
-            _isScanning = false;
-          }
         });
         
         if (isBluetoothAvailable) {
           // Start scanning for BLE devices
           _startScan();
-        } else {
-          log.info("Bluetooth is disabled, showing message");
-          // Bluetooth is disabled, show message
-          setState(() {
-            _isScanning = false;
-          });
-          
-          // Show a dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(FlutterI18n.translate(context, "ble_bluetooth_disabled_title")),
-              content: Text(FlutterI18n.translate(context, "ble_bluetooth_disabled_message")),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(FlutterI18n.translate(context, "ble_bluetooth_disabled_ok")),
-                ),
-              ],
-            ),
-          );
         }
       } catch (e, stack) {
         log.severe("Error checking Bluetooth availability", e, stack);
@@ -180,19 +159,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       
       // Check cloud status
       _checkCloudStatus();
+      
+      // Listen for Bluetooth state changes
+      FlutterBluePlus.adapterState.listen((state) {
+        log.info("Bluetooth adapter state changed: $state");
+        final isAvailable = state == BluetoothAdapterState.on;
+        
+        if (isAvailable != _bluetoothEnabled) {
+          setState(() {
+            _bluetoothEnabled = isAvailable;
+          });
+          
+          if (isAvailable) {
+            // Bluetooth was turned on, start scanning
+            _startScan();
+          } else {
+            // Bluetooth was turned off, update UI
+            setState(() {
+              _isScanning = false;
+              _foundDevices = [];
+            });
+          }
+        }
+      });
     } catch (e, stack) {
       log.severe("Error in _startSetup", e, stack);
       setState(() {
         _isScanning = false;
         _bluetoothEnabled = false;
       });
-      
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error starting setup: ${e.toString()}")),
-        );
-      }
     }
   }
   
@@ -604,12 +599,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
   }
 
-  Widget _buildBottomContent() {
-    if (!_isScanning && _foundDevices.isEmpty && !_showingCloudLogin) {
-      // Initial welcome screen
+  Widget _buildContent() {
+    // Initial welcome screen
+    if (!_setupStarted) {
       return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Scooter visual
+          Expanded(
+            child: GestureDetector(
+              // Easter egg - tap 27 times to skip onboarding
+              onTap: () {
+                tapCount++;
+                if (tapCount >= 27) {
+                  log.info('27 taps detected! Skipping onboarding...');
+                  tapCount = 0;
+                  // Schedule navigation after the build is complete
+                  Future.microtask(() {
+                    Navigator.of(context).pushReplacement(MaterialPageRoute(
+                      builder: (context) => const HomeScreen(forceOpen: true),
+                    ));
+                  });
+                }
+              },
+              child: const ScooterVisual(
+                state: ScooterState.disconnected,
+                scanning: false,
+                blinkerLeft: false,
+                blinkerRight: false,
+              ),
+            ),
+          ),
+          
+          // Welcome text and button
           Text(
             FlutterI18n.translate(context, "onboarding_step0_heading"),
             style: Theme.of(context).textTheme.headlineLarge,
@@ -641,9 +664,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 16),
         ],
       );
+    }
+    
+    // Setup screen
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Main content area
+        Expanded(
+          child: _buildSetupContent(),
+        ),
+        
+        // Cloud connection button (always visible)
+        const SizedBox(height: 16),
+        if (!_showingCloudLogin)
+          OutlinedButton.icon(
+            onPressed: _showCloudLogin,
+            icon: const Icon(Icons.cloud),
+            label: Text(FlutterI18n.translate(context, "add_scooter_cloud")),
+          ),
+      ],
+    );
+  }
+  
+  Widget _buildSetupContent() {
+    if (_showingCloudLogin) {
+      // Cloud login UI
+      return _buildCloudTokenDialog();
     } else if (_isScanning) {
       // Scanning UI
       return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const CircularProgressIndicator(),
           const SizedBox(height: 24),
@@ -652,17 +703,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             style: Theme.of(context).textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: _showCloudLogin,
-            icon: const Icon(Icons.cloud),
-            label: Text(FlutterI18n.translate(context, "add_scooter_cloud_login")),
-          ),
         ],
       );
     } else if (!_bluetoothEnabled) {
       // Bluetooth disabled UI
       return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.bluetooth_disabled, size: 48, color: Colors.red),
           const SizedBox(height: 16),
@@ -682,12 +728,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             icon: const Icon(Icons.refresh),
             label: Text(FlutterI18n.translate(context, "ble_scan_again")),
           ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _showCloudLogin,
-            icon: const Icon(Icons.cloud),
-            label: Text(FlutterI18n.translate(context, "add_scooter_cloud")),
-          ),
         ],
       );
     } else if (_foundDevices.isNotEmpty) {
@@ -701,8 +741,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 200,
+          Expanded(
             child: ListView.builder(
               itemCount: _foundDevices.length,
               itemBuilder: (context, index) {
@@ -722,30 +761,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _startScan,
-                icon: const Icon(Icons.refresh),
-                label: Text(FlutterI18n.translate(context, "ble_scan_again")),
-              ),
-              OutlinedButton.icon(
-                onPressed: _showCloudLogin,
-                icon: const Icon(Icons.cloud),
-                label: Text(FlutterI18n.translate(context, "add_scooter_cloud")),
-              ),
-            ],
+          ElevatedButton.icon(
+            onPressed: _startScan,
+            icon: const Icon(Icons.refresh),
+            label: Text(FlutterI18n.translate(context, "ble_scan_again")),
           ),
         ],
       );
-    } else if (_showingCloudLogin) {
-      // Cloud login UI
-      return _buildCloudTokenDialog();
+    } else {
+      // No devices found
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.search_off, size: 48, color: Colors.orange),
+          const SizedBox(height: 16),
+          Text(
+            FlutterI18n.translate(context, "ble_no_devices_found"),
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _startScan,
+            icon: const Icon(Icons.refresh),
+            label: Text(FlutterI18n.translate(context, "ble_scan_again")),
+          ),
+        ],
+      );
     }
-    
-    // Default empty widget
-    return const SizedBox.shrink();
   }
 
   @override
@@ -782,41 +825,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         child: Padding(
           padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.max,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Scooter visual
-              Expanded(
-                child: GestureDetector(
-                  // Easter egg - tap 27 times to skip onboarding
-                  onTap: () {
-                    tapCount++;
-                    if (tapCount >= 27) {
-                      log.info('27 taps detected! Skipping onboarding...');
-                      tapCount = 0;
-                      // Schedule navigation after the build is complete
-                      Future.microtask(() {
-                        Navigator.of(context).pushReplacement(MaterialPageRoute(
-                          builder: (context) => const HomeScreen(forceOpen: true),
-                        ));
-                      });
-                    }
-                  },
-                  child: ScooterVisual(
-                    state: ScooterState.disconnected,
-                    scanning: _isScanning,
-                    blinkerLeft: false,
-                    blinkerRight: false,
-                  ),
-                ),
-              ),
-              
-              // Bottom content area
-              _buildBottomContent(),
-            ],
-          ),
+          child: _buildContent(),
         ),
       ),
     );

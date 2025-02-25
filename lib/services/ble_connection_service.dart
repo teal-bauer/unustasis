@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 
 import '../flutter/blue_plus_mockable.dart';
@@ -26,6 +27,31 @@ class BLEConnectionService {
   bool get isConnected => _device?.isConnected ?? false;
   BluetoothDevice? get device => _device;
   CharacteristicRepository? get characteristicRepository => _characteristicRepository;
+  
+  // Check if Bluetooth is available and enabled
+  Future<bool> isBluetoothAvailable() async {
+    try {
+      // Check if Bluetooth is supported on this device
+      if (!await _flutterBluePlus.isSupported) {
+        log.info("Bluetooth is not supported on this device");
+        return false;
+      }
+      
+      // Check if Bluetooth is turned on
+      final state = await _flutterBluePlus.adapterState.first;
+      log.info("Bluetooth adapter state: $state");
+      
+      if (state != BluetoothAdapterState.on) {
+        log.info("Bluetooth is not turned on (state: $state)");
+        return false;
+      }
+      
+      return true;
+    } catch (e, stack) {
+      log.warning("Error checking Bluetooth availability", e, stack);
+      return false;
+    }
+  }
   
   BLEConnectionService(
     this._flutterBluePlus, {
@@ -114,6 +140,11 @@ class BLEConnectionService {
     bool preferSavedIds = true,
     Duration timeout = const Duration(seconds: 30),
   }) async {
+    // Check if Bluetooth is available before scanning
+    if (!await isBluetoothAvailable()) {
+      throw Exception("bluetooth must be turned on");
+    }
+    
     if (_flutterBluePlus.isScanningNow) {
       _flutterBluePlus.stopScan();
     }

@@ -236,5 +236,9 @@
     "controls_locate": "Find yer Ship",
     "controls_alarm": "Sound Alarm",
     "controls_ping": "Test the Winds",
-    "controls_refresh": "Demand Update"
+    "controls_refresh": "Demand Update",
+    
+    "ble_bluetooth_disabled_title": "Arrr! Ye Bluetooth be disabled!",
+    "ble_bluetooth_disabled_message": "Ye need to enable Bluetooth on yer device to find nearby ships, ye scurvy dog!",
+    "ble_bluetooth_disabled_ok": "Aye, Cap'n!"
 }

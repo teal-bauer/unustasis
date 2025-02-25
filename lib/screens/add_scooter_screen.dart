@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/scooter_manager.dart';
 import '../cloud_service.dart';
@@ -149,9 +150,84 @@ class _AddScooterScreenState extends State<AddScooterScreen> {
   }
 
   void _showCloudLogin() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+    showDialog(
+      context: context,
+      builder: (context) => _buildCloudTokenDialog(context),
+    );
+  }
+
+  Widget _buildCloudTokenDialog(BuildContext context) {
+    final TextEditingController tokenController = TextEditingController();
+    final manager = Provider.of<ScooterManager>(context, listen: false);
+    final cloudService = CloudService(manager);
+    
+    return AlertDialog(
+      title: Text(FlutterI18n.translate(context, "cloud_token_title")),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(FlutterI18n.translate(context, "cloud_token_description")),
+          const SizedBox(height: 16),
+          TextField(
+            controller: tokenController,
+            decoration: InputDecoration(
+              labelText: FlutterI18n.translate(context, "cloud_token_label"),
+              border: const OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () async {
+              // Open dashboard in browser
+              final url = Uri.parse('https://sunshine.rescoot.org/dashboard');
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url);
+              }
+            },
+            icon: const Icon(Icons.open_in_browser),
+            label: Text(FlutterI18n.translate(context, "cloud_token_get")),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(FlutterI18n.translate(context, "cloud_token_cancel")),
+        ),
+        TextButton(
+          onPressed: () async {
+            final token = tokenController.text.trim();
+            if (token.isEmpty) return;
+            
+            try {
+              await cloudService.setToken(token);
+              if (mounted) {
+                Navigator.pop(context);
+                // Refresh the screen to show cloud scooters
+                setState(() {
+                  _isCloudAuthenticated = true;
+                  _isCloudLoading = false;
+                });
+                // Show cloud scooters
+                _showCloudScooters();
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(FlutterI18n.translate(
+                    context, 
+                    "cloud_token_invalid",
+                    translationParams: {"error": e.toString()}
+                  ))),
+                );
+              }
+            }
+          },
+          child: Text(FlutterI18n.translate(context, "cloud_token_save")),
+        ),
+      ],
     );
   }
 

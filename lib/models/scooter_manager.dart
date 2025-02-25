@@ -58,6 +58,7 @@ class ScooterManager with ChangeNotifier {
   bool get openSeatOnUnlock => _openSeatOnUnlock;
   bool get hazardLocking => _hazardLocking;
   bool get optionalAuth => _optionalAuth;
+  BLEConnectionService get bleConnectionService => _bleConnectionService;
   
   // Background service compatibility getters
   ScooterState? get state => activeScooter?.state;

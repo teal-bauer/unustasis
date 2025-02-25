@@ -276,6 +276,9 @@
     "ble_connecting_message": "Connecting to your scooter...",
     "ble_scooter_added_success": "{name} added successfully",
     "ble_scooter_added_error": "Error adding scooter: {error}",
+    "ble_bluetooth_disabled_title": "Bluetooth is Disabled",
+    "ble_bluetooth_disabled_message": "Please enable Bluetooth on your device to scan for scooters.",
+    "ble_bluetooth_disabled_ok": "OK",
     
     "scooter_selection_title": "Select Scooter",
     "scooter_selection_empty": "No scooters found",

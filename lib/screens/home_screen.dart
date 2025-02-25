@@ -536,12 +536,15 @@ class _HomeScreenState extends State<HomeScreen> {
     // If there are no scooters, show onboarding
     if (manager.scooters.isEmpty) {
       FlutterNativeSplash.remove();
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const OnboardingScreen(),
-        ),
-      );
+      // Schedule navigation after the build is complete
+      Future.microtask(() {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const OnboardingScreen(),
+          ),
+        );
+      });
       return;
     }
     

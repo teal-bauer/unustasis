@@ -276,6 +276,9 @@
     "ble_connecting_message": "Verbinde mit deinem Roller...",
     "ble_scooter_added_success": "{name} erfolgreich hinzugefügt",
     "ble_scooter_added_error": "Fehler beim Hinzufügen des Rollers: {error}",
+    "ble_bluetooth_disabled_title": "Bluetooth ist deaktiviert",
+    "ble_bluetooth_disabled_message": "Bitte aktiviere Bluetooth auf deinem Gerät, um nach Rollern zu suchen.",
+    "ble_bluetooth_disabled_ok": "OK",
     
     "scooter_selection_title": "Roller auswählen",
     "scooter_selection_empty": "Keine Roller gefunden",

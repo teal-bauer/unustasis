@@ -29,7 +29,52 @@ class _BleScooterSelectionScreenState extends State<BleScooterSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _startScan();
+    _checkBluetoothAndScan();
+  }
+  
+  Future<void> _checkBluetoothAndScan() async {
+    final manager = Provider.of<ScooterManager>(context, listen: false);
+    
+    try {
+      // Check if Bluetooth is available before scanning
+      final bleService = manager.bleConnectionService;
+      final isBluetoothAvailable = await bleService.isBluetoothAvailable();
+      
+      if (!isBluetoothAvailable) {
+        if (mounted) {
+          _showBluetoothDisabledDialog();
+        }
+        return;
+      }
+      
+      // Bluetooth is available, start scanning
+      _startScan();
+    } catch (e, stack) {
+      log.severe("Error checking Bluetooth availability", e, stack);
+      if (mounted) {
+        _showBluetoothDisabledDialog();
+      }
+    }
+  }
+  
+  void _showBluetoothDisabledDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(FlutterI18n.translate(context, "ble_bluetooth_disabled_title")),
+        content: Text(FlutterI18n.translate(context, "ble_bluetooth_disabled_message")),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context); // Return to previous screen
+            },
+            child: Text(FlutterI18n.translate(context, "ble_bluetooth_disabled_ok")),
+          ),
+        ],
+      ),
+    );
   }
   
   @override
@@ -55,9 +100,7 @@ class _BleScooterSelectionScreenState extends State<BleScooterSelectionScreen> {
         _isScanning = false;
       });
       
-      if (devices.isEmpty) {
-        _showNoDevicesFoundDialog();
-      }
+      // Don't show a popup immediately, just show the empty state in the UI
     } catch (e, stack) {
       log.severe("Error scanning for devices", e, stack);
       setState(() {
@@ -65,9 +108,14 @@ class _BleScooterSelectionScreenState extends State<BleScooterSelectionScreen> {
       });
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(FlutterI18n.translate(context, "add_scooter_scan_error"))),
-        );
+        // Check if this is a Bluetooth disabled error
+        if (e.toString().contains("bluetooth must be turned on")) {
+          _showBluetoothDisabledDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(FlutterI18n.translate(context, "add_scooter_scan_error"))),
+          );
+        }
       }
     }
   }

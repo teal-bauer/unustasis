@@ -31,7 +31,7 @@ import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool? forceOpen;
-  
+
   const HomeScreen({
     this.forceOpen,
     super.key,
@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final manager = Provider.of<ScooterManager>(context);
     final activeScooter = manager.activeScooter;
-    
+
     return Scaffold(
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: context.isDarkMode
@@ -110,38 +110,52 @@ class _HomeScreenState extends State<HomeScreen> {
                 scooterState: activeScooter?.state,
                 scanning: manager.scanning,
               ),
-              
+
               // Optional seasonal effects
               if (_snowing)
                 SnowfallBackground(
                   backgroundColor: Colors.transparent,
-                  snowflakeColor: context.isDarkMode
-                      ? Colors.white.withValues(alpha: .15)
-                      : Colors.black.withValues(alpha: .05),
+                  snowflakeColor:
+                      context.isDarkMode ? Colors.white.withValues(alpha: .15) : Colors.black.withValues(alpha: .05),
                 ),
-              
+
               // Main content
               SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     mainAxisSize: MainAxisSize.max,
                     children: [
-                      // Top bar with scooter name and additional buttons
-                      _buildTopBar(context, activeScooter),
-                      
-                      // Status text
-                      const StatusText(),
-                      
+                      // Top section with connection status and scooter visual
+                      Column(
+                        children: [
+                          // Scooter name
+                          Text(
+                            activeScooter?.name ?? FlutterI18n.translate(context, "stats_no_name"),
+                            style: Theme.of(context).textTheme.headlineSmall,
+                            textAlign: TextAlign.center,
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // Status text
+                          const StatusText(),
+
+                          const SizedBox(height: 8),
+
+                          // Connection status icons
+                          const ConnectionStatusIcons(),
+
+                          const SizedBox(height: 8),
+
+                          // Battery indicators
+                          if (activeScooter?.primarySOC != null) const BatteryBars(),
+                        ],
+                      ),
+
                       const SizedBox(height: 16),
-                      
-                      // Battery indicators
-                      if (activeScooter?.primarySOC != null)
-                        const BatteryBars(),
-                      
-                      const SizedBox(height: 16),
-                      
+
                       // Scooter visual
                       Expanded(
                         child: ScooterVisual(
@@ -153,19 +167,49 @@ class _HomeScreenState extends State<HomeScreen> {
                           winter: _snowing,
                         ),
                       ),
-                      
-                      // Reconnect button if disconnected
-                      if (activeScooter == null || !manager.connected)
-                        ScooterActionButton(
-                          onPressed: () => manager.attemptToConnectToActiveScooter(),
-                          icon: Icons.refresh_rounded,
-                          label: FlutterI18n.translate(context, "home_reconnect_button"),
-                        ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Main action buttons
-                      _buildActionButtons(context, activeScooter),
+
+                      // Middle section with scooter name and navigation buttons
+                      Column(
+                        children: [
+                          // Row of buttons
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // Switch Scooter button
+                              _buildCircleButton(
+                                context,
+                                Icons.swap_horiz,
+                                FlutterI18n.translate(context, "switch_scooter"),
+                                () => _showScooterSelectionDialog(context),
+                              ),
+
+                              // Scooter Settings button
+                              _buildCircleButton(
+                                context,
+                                Icons.settings_outlined,
+                                FlutterI18n.translate(context, "settings"),
+                                () => _navigateToSettings(context),
+                              ),
+
+                              // Scooter Info button
+                              _buildCircleButton(
+                                context,
+                                Icons.info_outline,
+                                FlutterI18n.translate(context, "info"),
+                                () => _navigateToStats(context),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+
+                      // Bottom section with control buttons
+                      Column(
+                        children: [
+                          // Main action buttons
+                          _buildActionButtons(context, activeScooter),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -191,23 +235,22 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => _showScooterSelectionDialog(context),
               tooltip: FlutterI18n.translate(context, 'switch_scooter'),
             ),
-            
+
             const SizedBox(width: 8),
-            
+
             // Scooter name
             Expanded(
               child: Text(
-                activeScooter?.name ?? 
-                    FlutterI18n.translate(context, "stats_no_name"),
+                activeScooter?.name ?? FlutterI18n.translate(context, "stats_no_name"),
                 style: Theme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
             ),
           ],
         ),
-        
+
         const SizedBox(height: 8),
-        
+
         // Second row with navigation and status
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -218,10 +261,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => _navigateToSettings(context),
               tooltip: FlutterI18n.translate(context, 'settings'),
             ),
-            
+
             // Connection status icons
             const ConnectionStatusIcons(),
-            
+
             // Info button
             IconButton(
               icon: const Icon(Icons.info_outline),
@@ -236,49 +279,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildActionButtons(BuildContext context, Scooter? activeScooter) {
     final scooterState = activeScooter?.state;
-    
-      // If no scooters are added yet, show a big "Add Scooter" button
-      if (activeScooter == null) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Disconnected scooter silhouette
-            Image.asset(
-              "images/scooter/disconnected.webp",
-              height: 120,
-              opacity: const AlwaysStoppedAnimation(0.7),
+
+    // If no scooters are added yet, show a big "Add Scooter" button
+    if (activeScooter == null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Disconnected scooter silhouette
+          Image.asset(
+            "images/scooter/disconnected.webp",
+            height: 120,
+            opacity: const AlwaysStoppedAnimation(0.7),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Add scooter button
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const AddScooterScreen()),
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Add scooter button
-            ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const AddScooterScreen()),
-              ),
-              icon: const Icon(Icons.add),
-              label: Text(
-                FlutterI18n.translate(context, "settings_add_scooter"),
-                style: const TextStyle(fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              ),
+            icon: const Icon(Icons.add),
+            label: Text(
+              FlutterI18n.translate(context, "settings_add_scooter"),
+              style: const TextStyle(fontSize: 16),
             ),
-            
-            const SizedBox(height: 16),
-            
-            Text(
-              FlutterI18n.translate(context, "add_scooter_description"),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             ),
-          ],
-        );
-      }
-    
+          ),
+
+          const SizedBox(height: 16),
+
+          Text(
+            FlutterI18n.translate(context, "add_scooter_description"),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+          ),
+        ],
+      );
+    }
+
     // Regular action buttons for connected scooters
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -290,22 +333,20 @@ class _HomeScreenState extends State<HomeScreen> {
           seatClosed: activeScooter.seatClosed,
           state: activeScooter.state,
         ),
-        
+
         // Power button (lock/unlock)
         Expanded(
           child: ScooterPowerButton(
             action: scooterState?.isReadyForLockChange == true
                 ? () => _handlePowerButtonPress(context, scooterState)
                 : null,
-            icon: scooterState?.isOn == true
-                ? Icons.lock_open
-                : Icons.lock_outline,
+            icon: scooterState?.isOn == true ? Icons.lock_open : Icons.lock_outline,
             label: scooterState?.isOn == true
                 ? FlutterI18n.translate(context, "home_lock_button")
                 : FlutterI18n.translate(context, "home_unlock_button"),
           ),
         ),
-        
+
         // Controls button
         Expanded(
           child: ScooterActionButton(
@@ -344,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _handleSeatButtonPress(BuildContext context) async {
     final manager = Provider.of<ScooterManager>(context, listen: false);
-    
+
     try {
       await manager.executeCommand(
         CommandType.openSeat,
@@ -360,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _handlePowerButtonPress(BuildContext context, ScooterState? state) async {
     final manager = Provider.of<ScooterManager>(context, listen: false);
-    
+
     if (state == null || !state.isReadyForLockChange) return;
 
     try {
@@ -413,30 +454,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<bool> _showCloudConfirmationDialog(BuildContext context) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          FlutterI18n.translate(context, "cloud_command_confirm_title"),
-        ),
-        content: Text(
-          FlutterI18n.translate(context, "cloud_command_confirm_body"),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              FlutterI18n.translate(context, "cloud_command_confirm_cancel"),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              FlutterI18n.translate(context, "cloud_command_confirm_title"),
             ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(
-              FlutterI18n.translate(context, "cloud_command_confirm_confirm"),
+            content: Text(
+              FlutterI18n.translate(context, "cloud_command_confirm_body"),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  FlutterI18n.translate(context, "cloud_command_confirm_cancel"),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(
+                  FlutterI18n.translate(context, "cloud_command_confirm_confirm"),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   void _showSeatWarning(BuildContext context) {
@@ -476,23 +518,17 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Image.asset(
-                "assets/anim/handlebars.png",  // Converted from Lottie to static image for simplicity
+                "assets/anim/handlebars.png", // Converted from Lottie to static image for simplicity
                 height: 160,
               ),
               const SizedBox(height: 24),
-              Text(FlutterI18n.translate(
-                context,
-                "${didNotUnlock ? "locked" : "unlocked"}_handlebar_alert_title"
-              )),
+              Text(FlutterI18n.translate(context, "${didNotUnlock ? "locked" : "unlocked"}_handlebar_alert_title")),
             ],
           ),
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                Text(FlutterI18n.translate(
-                  context,
-                  "${didNotUnlock ? "locked" : "unlocked"}_handlebar_alert_body"
-                )),
+                Text(FlutterI18n.translate(context, "${didNotUnlock ? "locked" : "unlocked"}_handlebar_alert_body")),
               ],
             ),
           ),
@@ -504,10 +540,8 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             TextButton(
-              child: Text(FlutterI18n.translate(
-                context,
-                "${didNotUnlock ? "locked" : "unlocked"}_handlebar_alert_action"
-              )),
+              child: Text(
+                  FlutterI18n.translate(context, "${didNotUnlock ? "locked" : "unlocked"}_handlebar_alert_action")),
               onPressed: () {
                 final manager = Provider.of<ScooterManager>(context, listen: false);
                 if (didNotUnlock) {
@@ -530,9 +564,38 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildCircleButton(
+    BuildContext context,
+    IconData icon,
+    String tooltip,
+    VoidCallback onPressed,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: IconButton(
+              icon: Icon(icon),
+              onPressed: onPressed,
+              tooltip: tooltip,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _redirectOrStart() async {
     final manager = Provider.of<ScooterManager>(context, listen: false);
-    
+
     // If there are no scooters, show onboarding
     if (manager.scooters.isEmpty) {
       FlutterNativeSplash.remove();
@@ -547,10 +610,10 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       return;
     }
-    
+
     // Otherwise try to connect to active scooter
     manager.attemptToConnectToActiveScooter();
-    
+
     // Handle biometric authentication if needed
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if ((prefs.getBool("biometrics") ?? false) && mounted) {
@@ -562,9 +625,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         if (!didAuthenticate) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(
-              FlutterI18n.translate(context, "biometrics_failed")
-            )),
+            SnackBar(content: Text(FlutterI18n.translate(context, "biometrics_failed"))),
           );
           Navigator.of(context).pop();
           SystemNavigator.pop();
@@ -574,9 +635,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (e, stack) {
         log.info("Biometrics failed", e, stack);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(
-            FlutterI18n.translate(context, "biometrics_failed")
-          )),
+          SnackBar(content: Text(FlutterI18n.translate(context, "biometrics_failed"))),
         );
         Navigator.of(context).pop();
         SystemNavigator.pop();
@@ -584,7 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       manager.optionalAuth = true;
     }
-    
+
     FlutterNativeSplash.remove();
   }
 }
@@ -624,16 +683,9 @@ class StateCircle extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           color: scooterState?.isOn == true
               ? context.isDarkMode
-                  ? HSLColor.fromColor(Theme.of(context).colorScheme.primary)
-                      .withLightness(0.18)
-                      .toColor()
-                  : HSLColor.fromColor(Theme.of(context).colorScheme.primary)
-                      .withAlpha(0.3)
-                      .toColor()
-              : Theme.of(context)
-                  .colorScheme
-                  .surfaceContainer
-                  .withValues(alpha: context.isDarkMode ? 0.5 : 0.7),
+                  ? HSLColor.fromColor(Theme.of(context).colorScheme.primary).withLightness(0.18).toColor()
+                  : HSLColor.fromColor(Theme.of(context).colorScheme.primary).withAlpha(0.3).toColor()
+              : Theme.of(context).colorScheme.surfaceContainer.withValues(alpha: context.isDarkMode ? 0.5 : 0.7),
         ),
       ),
     );

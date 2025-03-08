@@ -133,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           // Scooter name
                           Text(
                             activeScooter?.name ?? FlutterI18n.translate(context, "stats_no_name"),
-                            style: Theme.of(context).textTheme.headlineSmall,
+                            style: Theme.of(context).textTheme.headlineMedium,
                             textAlign: TextAlign.center,
                           ),
 
@@ -570,23 +570,35 @@ class _HomeScreenState extends State<HomeScreen> {
     String tooltip,
     VoidCallback onPressed,
   ) {
+    Color mainColor = Theme.of(context).colorScheme.onSurface;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(30),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.all(16), // Smaller padding than control buttons
+              side: BorderSide(
+                color: mainColor,
+              ),
             ),
-            child: IconButton(
-              icon: Icon(icon),
-              onPressed: onPressed,
-              tooltip: tooltip,
+            onPressed: onPressed,
+            child: Icon(
+              icon,
+              color: mainColor,
+              size: 20, // Smaller icon size
             ),
+          ),
+          const SizedBox(height: 8), // Smaller spacing
+          Text(
+            tooltip,
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium // Smaller text
+                ?.copyWith(color: mainColor),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
